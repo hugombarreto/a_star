@@ -1,15 +1,16 @@
 """
 specializer AStarSpecializer
 """
+from AStarSpecializer.specializers import AStarSpecializer
 
-from ctree.jit import LazySpecializedFunction
 
+def mul_3(i):
+    return i*3
 
-class AStarSpecializer(LazySpecializedFunction):
-
-    def transform(self):
-        pass
 
 if __name__ == '__main__':
-    pass
+    c_mul_3 = AStarSpecializer.from_function(mul_3, 'Translator')
+
+    print mul_3(2)
+    print c_mul_3(2)
 
