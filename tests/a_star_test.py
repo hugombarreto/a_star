@@ -13,17 +13,15 @@ class GraphGenerator(object):
     barrier_probability = 0.3
 
     @staticmethod
-    def get_random_grid(x, y):
+    def get_random_grid(dimension):
         generate_barriers = np.vectorize(lambda i: np.inf
             if i < GraphGenerator.barrier_probability else np.rint(i*1000)+1)
-        grid_array = generate_barriers(np.random.rand(x, y))
-        start = (np.random.random_integers(0, x - 1),
-                 np.random.random_integers(0, y - 1))
-        finish = (np.random.random_integers(0, x - 1),
-                  np.random.random_integers(0, y - 1))
+        grid_array = generate_barriers(np.random.rand(*dimension))
+        start = [np.random.random_integers(0, i - 1) for i in dimension]
+        finish = [np.random.random_integers(0, i - 1) for i in dimension]
         grid_array[start] = 0
         grid_array[finish] = 0
-        return Grid(grid_array), start, finish
+        return Grid(grid_array), np.array(start), np.array(finish)
 
     @staticmethod
     def get_grid_from_file(filename):
@@ -35,15 +33,14 @@ class GraphGenerator(object):
 class TestAStar(unittest.TestCase):
     def __init__(self, *args, **kwargs):
         super(TestAStar, self).__init__(*args, **kwargs)
-        self.grid_size = (100, 100)
+        self.grid_size = (10, 10, 10)
         self.graph_size = self.grid_size[0] * self.grid_size[1]
 
     def test_random_grid(self):
-        grid, start, finish = GraphGenerator.get_random_grid(*self.grid_size)
+        grid, start, finish = GraphGenerator.get_random_grid(self.grid_size)
        # grid.save("random_grid", "boards/", start, finish)
         self.assertEqual(get_a_star_cost(grid, start, finish),
                          get_a_star_cost(grid, finish, start))
-        print "OK"
 
     def test_grid_from_file(self):
         import glob
@@ -57,17 +54,17 @@ class TestAStar(unittest.TestCase):
 
 
 def get_a_star_cost(graph, start, finish):
-    path_trace = graph.a_star(Node(start), Node(finish))
+    path_trace = graph.a_star(start, finish)
 
-    if finish not in path_trace:
+    if tuple(finish) not in path_trace:
         return None
 
     cost = 0
     current_node = finish
 
-    while current_node != start:
-        current_parent = path_trace[current_node].parent
-        cost += graph.get_neighbor_edges(current_parent)[current_node]
+    while tuple(current_node) != tuple(start):
+        current_parent = path_trace[tuple(current_node)].parent
+        cost += graph.get_neighbor_edges(current_parent)[tuple(current_node)]
         current_node = current_parent
 
     return cost

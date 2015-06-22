@@ -2,7 +2,7 @@ import pickle
 from os import listdir
 import heapq
 import numpy as np
-from AStarSpecializer.np_functional import np_map, np_reduce
+from AStarSpecializer.np_functional import np_map, np_reduce, np_elementwise
 
 
 class PriorityQueue(object):
@@ -75,45 +75,43 @@ class Graph(object):
         else:
             self._edges[a.get_id()] = {b.get_id(): weight}
 
-    def a_star(self, start, target):
+    def a_star(self, start_id, target_id):
         nodes_info = {}
         open_list = PriorityQueue()
-        open_list.push(start, 0)
-        target_id = target.get_id()
+        open_list.push(Node(start_id), 0)
 
         start_info = self.NodeInfo()
         start_info.f = 0
         start_info.g = 0
-        start_id = start.get_id()
-        nodes_info[start_id] = start_info
+        nodes_info[tuple(start_id)] = start_info
 
         while len(open_list) > 0:
             current_node = open_list.pop()
             current_node_id = current_node.get_id()
 
-            if current_node_id == target_id:
+            if tuple(current_node_id) == tuple(target_id):
                 break
 
-            current_node_info = nodes_info[current_node_id]
+            current_node_info = nodes_info[tuple(current_node_id)]
             current_node_info.closed = True
 
-            for adj_node_id, adj_node_to_parent_weight in \
-                    self._get_neighbor_weight_list(current_node_id):
-                adj_node_info = nodes_info[adj_node_id] if \
-                    adj_node_id in nodes_info else self.NodeInfo()
+            # for adj_node_id, adj_node_to_parent_weight in \
+            #         self._get_neighbor_weight_list(current_node_id):
+            #     adj_node_info = nodes_info[adj_node_id] if \
+            #         adj_node_id in nodes_info else self.NodeInfo()
+            #
+            #     if not adj_node_info.closed:
+            #         g = current_node_info.g + adj_node_to_parent_weight
+            #         if adj_node_id not in nodes_info or g < adj_node_info.g:
+            #             adj_node_info.parent = current_node_id
+            #             h = self._calculate_heuristic_cost(
+            #                 np.array(adj_node_id), target_id)
+            #             adj_node_info.g = g
+            #             adj_node_info.f = g + h
+            #             open_list.push(Node(adj_node_id, adj_node_info.f))
+            #             nodes_info[adj_node_id] = adj_node_info
 
-                if not adj_node_info.closed:
-                    g = current_node_info.g + adj_node_to_parent_weight
-                    if adj_node_id not in nodes_info or g < adj_node_info.g:
-                        adj_node_info.parent = current_node_id
-                        h = self._calculate_heuristic_cost(adj_node_id,
-                                                           target.get_id())
-                        adj_node_info.g = g
-                        adj_node_info.f = g + h
-                        open_list.push(Node(adj_node_id, adj_node_info.f))
-                        nodes_info[adj_node_id] = adj_node_info
-
-            nodes_info[current_node_id] = current_node_info
+            nodes_info[tuple(current_node_id)] = current_node_info
 
         return nodes_info
 
@@ -142,6 +140,7 @@ class Graph(object):
 
 class BaseGrid(Graph):
     """Base class for grids, implements grids heuristic"""
+
     def __init__(self, grid):
         """
         Args:
@@ -171,19 +170,20 @@ class BaseGrid(Graph):
 
     def _calculate_heuristic_cost(self, current_node_id, target_node_id):
         # Using 1-norm
-        return self._calculate_1_norm(np.array(current_node_id) -
-                                         np.array(target_node_id))
+        return self._calculate_1_norm(np_elementwise(
+            lambda x, y: x - y, current_node_id, target_node_id))
 
     @staticmethod
     def _calculate_p_norm(p, vector):
-        return np_reduce(lambda x, y: x+y, np_map(lambda z: -z if z < 0 else z,
-                                                   vector)**p )**(1./p)
-        # return BaseGrid.super_sum(vector)
+        return np_reduce(lambda x, y: x + y,
+                         np_map(lambda z: -z if z < 0 else z,
+                                vector) ** p) ** (1. / p)
 
     @staticmethod
     def _calculate_1_norm(vector):
-        return np_reduce(lambda x, y: x+y, np_map(lambda z: -z if z < 0 else z,
-                                                   vector))
+        return np_reduce(lambda x, y: x + y,
+                         np_map(lambda z: -z if z < 0 else z, vector))
+
 
 class GridAsGraph(BaseGrid):
     """This class converts Grids to Graphs."""
@@ -209,6 +209,7 @@ class GridAsGraph(BaseGrid):
 
 class GridAsArray(BaseGrid):
     """ This class uses the grid as a numpy.array instead of a graph"""
+
     def __init__(self, grid):
         """
         Args:
