@@ -95,21 +95,21 @@ class Graph(object):
             current_node_info = nodes_info[tuple(current_node_id)]
             current_node_info.closed = True
 
-            # for adj_node_id, adj_node_to_parent_weight in \
-            #         self._get_neighbor_weight_list(current_node_id):
-            #     adj_node_info = nodes_info[adj_node_id] if \
-            #         adj_node_id in nodes_info else self.NodeInfo()
-            #
-            #     if not adj_node_info.closed:
-            #         g = current_node_info.g + adj_node_to_parent_weight
-            #         if adj_node_id not in nodes_info or g < adj_node_info.g:
-            #             adj_node_info.parent = current_node_id
-            #             h = self._calculate_heuristic_cost(
-            #                 np.array(adj_node_id), target_id)
-            #             adj_node_info.g = g
-            #             adj_node_info.f = g + h
-            #             open_list.push(Node(adj_node_id, adj_node_info.f))
-            #             nodes_info[adj_node_id] = adj_node_info
+            for adj_node_id, adj_node_to_parent_weight in \
+                    self._get_neighbor_weight_list(current_node_id):
+                adj_node_info = nodes_info[adj_node_id] if \
+                    adj_node_id in nodes_info else self.NodeInfo()
+
+                if not adj_node_info.closed:
+                    g = current_node_info.g + adj_node_to_parent_weight
+                    if adj_node_id not in nodes_info or g < adj_node_info.g:
+                        adj_node_info.parent = current_node_id
+                        h = self._calculate_heuristic_cost(
+                            np.array(adj_node_id), target_id)
+                        adj_node_info.g = g
+                        adj_node_info.f = g + h
+                        open_list.push(Node(adj_node_id, adj_node_info.f))
+                        nodes_info[adj_node_id] = adj_node_info
 
             nodes_info[tuple(current_node_id)] = current_node_info
 
@@ -124,7 +124,7 @@ class Graph(object):
             file_counter += 1
         pickle.dump((self, start_node, end_node),
                     open(directory + file_name, "wb"))
-        print "saved"
+        print 'saved: "' + directory + file_name + '"'
 
     def _calculate_heuristic_cost(self, current_node_id, target_node_id):
         # no heuristics by default, works as Dijkstra's shortest path

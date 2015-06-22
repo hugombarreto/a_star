@@ -5,8 +5,8 @@ from AStarSpecializer.a_star import Node, GridAsArray
 from AStarSpecializer.specializers import get_specialized_a_star_grid
 
 
-Grid = get_specialized_a_star_grid(GridAsArray)
-#Grid = GridAsArray
+#Grid = get_specialized_a_star_grid(GridAsArray)
+Grid = GridAsArray
 
 
 class GraphGenerator(object):
@@ -19,8 +19,8 @@ class GraphGenerator(object):
         grid_array = generate_barriers(np.random.rand(*dimension))
         start = [np.random.random_integers(0, i - 1) for i in dimension]
         finish = [np.random.random_integers(0, i - 1) for i in dimension]
-        grid_array[start] = 0
-        grid_array[finish] = 0
+        grid_array[tuple(start)] = 0
+        grid_array[tuple(finish)] = 0
         return Grid(grid_array), np.array(start), np.array(finish)
 
     @staticmethod
@@ -38,13 +38,17 @@ class TestAStar(unittest.TestCase):
 
     def test_random_grid(self):
         grid, start, finish = GraphGenerator.get_random_grid(self.grid_size)
-       # grid.save("random_grid", "boards/", start, finish)
-        self.assertEqual(get_a_star_cost(grid, start, finish),
-                         get_a_star_cost(grid, finish, start))
+        start_finish_cost = get_a_star_cost(grid, start, finish)
+        finish_start_cost = get_a_star_cost(grid, finish, start)
+
+        if start_finish_cost != finish_start_cost:
+            grid.save("random_grid", "boards/", start, finish)
+
+        self.assertEqual(start_finish_cost, finish_start_cost)
 
     def test_grid_from_file(self):
         import glob
-        files = glob.glob("boards/grid*.p")
+        files = glob.glob("boards/*.p")
         for file_name in files:
             grid, start, finish = GraphGenerator.get_grid_from_file(file_name)
             self.assertEqual(get_a_star_cost(grid, start, finish),
