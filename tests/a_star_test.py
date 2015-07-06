@@ -5,8 +5,8 @@ from AStarSpecializer.a_star import Node, GridAsArray
 from AStarSpecializer.specializers import get_specialized_a_star_grid
 
 
-#Grid = get_specialized_a_star_grid(GridAsArray)
-Grid = GridAsArray
+Grid = get_specialized_a_star_grid(GridAsArray)
+# Grid = GridAsArray
 
 
 class GraphGenerator(object):
@@ -19,9 +19,9 @@ class GraphGenerator(object):
         grid_array = generate_barriers(np.random.rand(*dimension))
         start = [np.random.random_integers(0, i - 1) for i in dimension]
         finish = [np.random.random_integers(0, i - 1) for i in dimension]
-        grid_array[tuple(start)] = 0
-        grid_array[tuple(finish)] = 0
-        return Grid(grid_array), np.array(start), np.array(finish)
+        grid_array[tuple(start)] = 1
+        grid_array[tuple(finish)] = 1
+        return Grid(grid_array), tuple(start), tuple(finish)
 
     @staticmethod
     def get_grid_from_file(filename):
@@ -45,6 +45,10 @@ class TestAStar(unittest.TestCase):
             grid.save("random_grid", "boards/", start, finish)
 
         self.assertEqual(start_finish_cost, finish_start_cost)
+
+    def test_many_random_grids(self):
+        for i in xrange(100):
+            self.test_random_grid()
 
     def test_grid_from_file(self):
         import glob
