@@ -86,6 +86,7 @@ class TransformFunctionalNP(NodeTransformer):
 
         elif func_name == "np_filter":
             return_type = self.array_type()
+            defn = None  # change that
             # TODO implement filter
 
         elif func_name == "np_elementwise":
@@ -106,16 +107,11 @@ class TransformFunctionalNP(NodeTransformer):
                     ]),
                 Return(SymbolRef("A")),
             ]
+        else:
+            return_type = None
+            defn = None
 
-        self.specialized_functions.append(FunctionDecl(return_type, specialized_func_name,
-                             params=params,
-                             defn=defn))
+        self.specialized_functions.append(FunctionDecl(
+            return_type, specialized_func_name, params=params, defn=defn))
         tree = FunctionCall(SymbolRef(specialized_func_name), [args[1]])
         return tree
-
-    def map_transform(self, node):
-        pass
-
-    def visit_FunctionDef(self, node):
-        print "FunctionDef"
-        return node
