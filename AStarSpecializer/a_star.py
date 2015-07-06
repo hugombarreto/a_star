@@ -1,3 +1,4 @@
+from collections import defaultdict
 import pickle
 from os import listdir
 import heapq
@@ -29,8 +30,8 @@ class Node(object):
     """
 
     def __init__(self, node_id, priority=None):
-        self._id = node_id
-        self._priority = priority
+        self.id = node_id
+        self.priority = priority
 
     def __lt__(self, other):
         return self.get_priority() < other.get_priority()
@@ -42,19 +43,19 @@ class Node(object):
         return self.get_priority() == other.get_priority()
 
     def __str__(self):
-        return "id: " + str(self._id) + ", priority: " + str(self._priority)
+        return "id: " + str(self.id) + ", priority: " + str(self.priority)
 
     def __repr__(self):
         return self.__str__()
 
     def get_priority(self):
-        return self._priority
+        return self.priority
 
     def set_priority(self, priority):
-        self._priority = priority
+        self.priority = priority
 
     def get_id(self):
-        return self._id
+        return self.id
 
 
 class Graph(object):
@@ -76,42 +77,41 @@ class Graph(object):
             self._edges[a.get_id()] = {b.get_id(): weight}
 
     def a_star(self, start_id, target_id):
-        nodes_info = {}
+        nodes_info = defaultdict(self.NodeInfo)
         open_list = PriorityQueue()
-        open_list.push(Node(start_id), 0)
+        open_list.push(Node(start_id, 0))
 
         start_info = self.NodeInfo()
         start_info.f = 0
         start_info.g = 0
-        nodes_info[tuple(start_id)] = start_info
+        nodes_info[start_id] = start_info
 
         while len(open_list) > 0:
             current_node = open_list.pop()
-            current_node_id = current_node.get_id()
+            current_node_id = current_node.id
 
-            if tuple(current_node_id) == tuple(target_id):
+            if current_node_id == target_id:
                 break
 
-            current_node_info = nodes_info[tuple(current_node_id)]
+            current_node_info = nodes_info[current_node_id]
             current_node_info.closed = True
 
             for adj_node_id, adj_node_to_parent_weight in \
                     self._get_neighbor_weight_list(current_node_id):
-                adj_node_info = nodes_info[adj_node_id] if \
-                    adj_node_id in nodes_info else self.NodeInfo()
+                adj_node_info = nodes_info[adj_node_id]
 
                 if not adj_node_info.closed:
                     g = current_node_info.g + adj_node_to_parent_weight
-                    if adj_node_id not in nodes_info or g < adj_node_info.g:
+                    if g < adj_node_info.g:
                         adj_node_info.parent = current_node_id
-                        h = self._calculate_heuristic_cost(
-                            np.array(adj_node_id), target_id)
+                        h = self._calculate_heuristic_cost(adj_node_id,
+                                                           target_id)
                         adj_node_info.g = g
                         adj_node_info.f = g + h
                         open_list.push(Node(adj_node_id, adj_node_info.f))
                         nodes_info[adj_node_id] = adj_node_info
 
-            nodes_info[tuple(current_node_id)] = current_node_info
+            nodes_info[current_node_id] = current_node_info
 
         return nodes_info
 
@@ -133,7 +133,7 @@ class Graph(object):
     class NodeInfo(object):
         def __init__(self):
             self.f = None
-            self.g = None
+            self.g = np.inf
             self.parent = None
             self.closed = False
 
@@ -170,6 +170,8 @@ class BaseGrid(Graph):
 
     def _calculate_heuristic_cost(self, current_node_id, target_node_id):
         # Using 1-norm
+        current_node_id = np.array(current_node_id)
+        target_node_id = np.array(target_node_id)
         return self._calculate_1_norm(np_elementwise(
             lambda x, y: x - y, current_node_id, target_node_id))
 
