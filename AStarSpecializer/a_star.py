@@ -26,36 +26,14 @@ class PriorityQueue(object):
 
 
 class Node(object):
-    """Used to make the nodes ordered based on the priority only
-    """
+    """Used to make the nodes ordered based on the priority only"""
 
     def __init__(self, node_id, priority=None):
         self.id = node_id
         self.priority = priority
 
     def __lt__(self, other):
-        return self.get_priority() < other.get_priority()
-
-    def __gt__(self, other):
-        return self.get_priority() > other.get_priority()
-
-    def __eq__(self, other):
-        return self.get_priority() == other.get_priority()
-
-    def __str__(self):
-        return "id: " + str(self.id) + ", priority: " + str(self.priority)
-
-    def __repr__(self):
-        return self.__str__()
-
-    def get_priority(self):
-        return self.priority
-
-    def set_priority(self, priority):
-        self.priority = priority
-
-    def get_id(self):
-        return self.id
+        return self.priority < other.priority
 
 
 class Graph(object):
