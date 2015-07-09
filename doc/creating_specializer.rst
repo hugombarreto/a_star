@@ -297,9 +297,11 @@ We are overriding three methods:
   ``transform`` method. The ``finalize`` is responsible to return a
   ``ConcreteSpecializedFunction``. The code for BasicFunction_, the class that
   inherits from ``ConcreteSpecializedFunction`` will be seen below but it
-  requires a ``Project`` and an entry type. A ``Project`` is used to pack all
-  the CFiles in your project, in this case just one. The entry type is the
-  interface between python and the C function created.
+  requires an entry name, a ``Project`` and an entry type. The entry name is
+  the name of the function we want the interface with, here it's ``"apply"``. A
+  ``Project`` is used to pack all the CFiles in your project, in this case just
+  one. The entry type is the interface between python and the C function
+  created.
 
   The ``Project`` class can be imported from ``ctree.nodes`` and it can be used
   as shown in the example, using the list of ``CFile`` as argument. To create
@@ -309,10 +311,8 @@ We are overriding three methods:
 
 .. _BasicFunction:
 
-The implementation fo the ``BasicFunction`` is simple, we need to implement two
-methods: ``__init__`` and ``__call__``. The ``__init__`` receive all the
-arguments we saw in the finalize_ method and assigns a compiled function to a
-function attribute.
+The implementation of the ``BasicFunction`` is simple, we need two methods:
+``__init__`` and ``__call__``. The code can be seen below.
 
 .. code:: python
 
@@ -324,6 +324,12 @@ function attribute.
 
         def __call__(self, *args, **kwargs):
             return self._c_function(*args, **kwargs)
+
+
+The ``__init__`` receives all the arguments we saw in the finalize_ method from
+the ``LazySpecializedFunction`` and assigns a compiled function to a class
+attribute. This is done so that the ``__call__`` method can use this compiled
+function with the arguments given when calling the ``BasicFunction``.
 
 .. code:: python
 
