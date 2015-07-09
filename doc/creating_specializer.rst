@@ -41,21 +41,21 @@ Basic Concepts
 
 Setup a project
 ---------------
-Make sure you have ctree installed:
+Make sure you have ctree installed::
 
-    ``sudo pip install ctree``
+    sudo pip install ctree
 
 Create a specializer project with the help of the ``ctree`` command, ``-sp``
-stands for *Start Project*:
+stands for *Start Project*::
 
-    ``ctree -sp ProjectName``
+    ctree -sp ProjectName
 
 A directory with the project structure will be created inside the current
 directory, using the *ProjectName* you provided.
 
-For the A* we are calling the project *AStar*:
+For the A* we are calling the project *AStar*::
 
-    ``ctree -sp AStar``
+    ctree -sp AStar
 
 
 Project Files
@@ -189,6 +189,7 @@ required classes. The first can be seen below.
 
 .. code:: python
 
+    import ctypes
     from ctree.types import get_ctype
     from ctree.nodes import Project
     from ctree.c.nodes import FunctionDecl, CFile
@@ -285,8 +286,9 @@ We are overriding three methods:
 
   The last step in the ``transform`` method is to put the tree in a ``CFile``,
   this is a node that represents a ``.c`` file and is what the ``transform``
-  method should return. We give the ``CFile`` the name "generated" and pass the
-  tree we generated to it. A list containing the ``CFile`` is finally returned.
+  method should return. We give the ``CFile`` the name ``"generated"`` and pass
+  the tree we generated to it. A list containing the ``CFile`` is finally
+  returned.
 
 .. _finalize:
 
@@ -294,7 +296,7 @@ We are overriding three methods:
   This method has two parameters: ``transform_result`` and ``program_config``.
   ``transform_result`` is what was returned by the ``transform``, the list with
   the ``CFile`` we created. ``program_config`` is the same parameter as in the
-  ``transform`` method. The ``finalize`` is responsible to return a
+  ``transform`` method. The ``finalize`` is responsible for returning a
   ``ConcreteSpecializedFunction``. The code for BasicFunction_, the class that
   inherits from ``ConcreteSpecializedFunction`` will be seen below but it
   requires an entry name, a ``Project`` and an entry type. The entry name is
@@ -329,7 +331,45 @@ The implementation of the ``BasicFunction`` is simple, we need two methods:
 The ``__init__`` receives all the arguments we saw in the finalize_ method from
 the ``LazySpecializedFunction`` and assigns a compiled function to a class
 attribute. This is done so that the ``__call__`` method can use this compiled
-function with the arguments given when calling the ``BasicFunction``.
+function with the arguments given when calling a ``BasicFunction`` instance.
+
+The Fibonacci Specializer is ready. To use the specializer we just have to call
+the method ``from_function`` as shown below.
+
+.. code:: python
+
+    c_fib = BasicTranslator.from_function(fib)
+
+This returns the specialized version of the function ``fib`` using our
+specializer ``BasicTranslator``. Now we can use ``c_fib`` as we would use
+``fib``.
+
+.. code:: python
+
+    print c_fib(10), fib(10)
+    print c_fib(4.5), fib(4.5)
+
+If everything went right this should display::
+
+    55 55
+    5.5 5.5
+
+The left numbers were calculated using the specialized function and are the
+same as the right, calculated using the regular python function. Since we used
+arguments with different types in each call two different specialized functions
+were generated.
+
+To see the source code generated we can enable logging by adding the following
+lines to the beginning of the file:
+
+.. code:: python
+
+    import logging
+    logging.basicConfig(level=20)
+
+This will show a lot of information when running the code, including the source
+code generated for the integer type and for the float type.
+
 
 .. code:: python
 
