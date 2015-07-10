@@ -272,7 +272,7 @@ method is called with such node as argument. The code below uses this visitor.
         a = "first string"
         b = "second string"
         c = "third string"
-        return a + b + c
+        return 0
 
     ast = get_ast(some_strings)
     StringPrinter().visit(ast)
@@ -329,7 +329,7 @@ The output should be::
     THIRD STRING
 
 Observe that now the method returns a modified node. The new node will
-substitute the old one in the AST. When we call the ``StringPrinter`` again
+substitute the old one in the AST. When we use the ``StringPrinter`` again
 it's possible to see that the strings are now uppercase.
 
 Specializer Project
@@ -348,7 +348,7 @@ directory, using the *ProjectName* you provided.
 Project Files
 .............
 Go into the directory created. You will notice that all the project structure
-is already created inside.
+is already created.
 
 .. image:: images/project_files.png
    :width: 800px
