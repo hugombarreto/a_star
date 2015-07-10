@@ -2,16 +2,21 @@
 Creating an A* Specializer
 ==========================
 
+.. warning:: Read the other file, this is not done yet. Some parts of this one
+   were moved to the other file.
+
 Introduction
 ------------
 This tutorial creates a specializer for the A* Algorithm. We will guide you
-through the steps you need to create your own specializer.
+through the steps you need to create your own specializer. This assumes you
+read the Introduction to Specializers and are familiar with the basic structure
+of specializers, visitors and transformers.
 
 The A* Algorithm is used to find the shortest path between two nodes in a
-graph. This algorithm achieves better results by the of a heuristics
-function. Depending on the application, different heuristics are used.
-The idea here is that the specializer user will be able to implement his
-own heuristic function in python and use it in the specializer.
+graph. This algorithm achieves better results by using a heuristics function.
+Depending on the application, different heuristics are used. The idea here is
+that the specializer user will be able to implement their own heuristic
+function in python and use it in the specializer.
 
 Writing a specializer usually consists of the following steps:
 
@@ -39,7 +44,7 @@ Basic Concepts
   values of specific types of node, but without modifying them.
 
 
-Setup a project
+Setup a Project
 ---------------
 Make sure you have ctree installed::
 
@@ -356,8 +361,8 @@ If everything went right this should display::
 
 The left numbers were calculated using the specialized function and are the
 same as the right, calculated using the regular python function. Since we used
-arguments with different types in each call two different specialized functions
-were generated.
+arguments with different types in each call, two different specialized
+functions were generated.
 
 To see the source code generated we can enable logging by adding the following
 lines to the beginning of the file:
