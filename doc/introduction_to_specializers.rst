@@ -338,32 +338,32 @@ To better organize your specializer files it's a good practice to create a
 specializer project. Ctree makes the process very easy.
 
 Create a specializer project with the help of the ``ctree`` command, ``-sp``
-stands for *Start Project*::
+stands for *start project*::
 
-    ctree -sp ProjectName
+    ctree -sp project_name
 
 A directory with the project structure will be created inside the current
-directory, using the *ProjectName* you provided.
+directory, using the *project_name* you provided.
 
 Project Files
 .............
 Go into the directory created. You will notice that all the project structure
-is already created.
+is already there.
 
 .. image:: images/project_files.png
    :width: 800px
 
 Here is a description of each file and directory purpose:
 
-- **ProjectName/** will be your project name, it is used to store the actual
-  specializer, inside there are already two files: **__init__.py** and
+- **project_name/** will be your project name, it is used to store the actual
+  specializer. Inside there are already two files: **__init__.py** and
   **main.py**;
 
   - **__init__.py** is used to mark the directory as a Python package, you can
     also put initialization code for your specializer package here;
   - **main.py** is where we will put the main class for the specializer, if you
     look inside the file you will see it already contains a class named
-    *ProjectName* inherited from *LazySpecializedFunction*.
+    *project_name* inherited from *LazySpecializedFunction*.
 
 - **README.rst** should contain a brief explanation about what the specializer
   do and how to use it, more detailed explanation should be placed in the doc
