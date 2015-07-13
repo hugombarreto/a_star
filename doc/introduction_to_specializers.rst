@@ -228,6 +228,26 @@ same as the right, calculated using the regular python function. Since we used
 arguments with different types in each call, two different specialized
 functions were generated.
 
+We can check the running time difference for each function. Using the
+``timeit`` module, we will run ``fib`` and ``c_fib`` 5 times.
+
+.. code:: python
+
+    import timeit
+    print timeit.repeat('fib(40)', 'from __main__ import fib', repeat=5, number=1)
+    print timeit.repeat('c_fib(40)', 'from __main__ import c_fib', repeat=5, number=1)
+
+This gives the following result::
+
+    [40.199851989746094, 40.37747597694397, 40.18321490287781, 39.94676399230957, 39.642497062683105]
+    [0.6781659126281738, 0.6149849891662598, 0.6104881763458252, 0.6176388263702393, 0.618818998336792]
+
+The first and second lists have the times, in seconds, for each call to
+``fib(40)`` and ``c_fib(40)`` respectively. ``c_fib`` runs approximately 60
+times faster than ``fib`` in the first call and about 65 times faster in the
+following. The first call to ``c_fib`` is a bit slower than the next ones
+because it specializes and compiles the function.
+
 To see the source code generated we can enable logging by adding the following
 lines to the beginning of the file:
 
@@ -288,8 +308,7 @@ same way we used the ``PyBasicConversions`` in the specializer.
 
 .. note::
      We don't need to call ``get_ast`` in the specializer as the ``tree``
-     argument we were receiving, in the transform_ method, was already
-     converted to AST.
+     argument, from the transform_ method, was already converted to AST.
 
 We can also do something similar in order to count the number of string in the
 AST.
