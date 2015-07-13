@@ -310,7 +310,7 @@ same way we used the ``PyBasicConversions`` in the specializer.
      We don't need to call ``get_ast`` in the specializer as the ``tree``
      argument, from the transform_ method, was already converted to AST.
 
-We can also do something similar in order to count the number of string in the
+We can also do something similar in order to count the number of strings in the
 AST.
 
 .. code:: python
