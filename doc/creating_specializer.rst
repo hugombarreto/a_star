@@ -9,39 +9,25 @@ Introduction
 ------------
 This tutorial creates a specializer for the A* Algorithm. We will guide you
 through the steps you need to create your own specializer. This assumes you
-read the Introduction to Specializers and are familiar with the basic structure
-of specializers, visitors and transformers.
+read the **Introduction to Specializers** and are familiar with the basic
+structure of specializers, visitors and transformers.
 
 The A* Algorithm is used to find the shortest path between two nodes in a
 graph. This algorithm achieves better results by using a heuristics function.
 Depending on the application, different heuristics are used. The idea here is
 that the specializer user will be able to implement their own heuristic
-function in python and use it in the specializer.
+function in python and use it in the specializer. In this specializer, we're
+focusing on Grid Graphs as they're the most common scenario fo the A*.
 
 Writing a specializer usually consists of the following steps:
 
 - `Setup a project`_;
 - `Writing the Python Code to be Specialized`_;
-- Create tests that will be used to check the python code and later to test
+- `Create tests`_ that will be used to check the python code and later to test
   the specialized code;
 - `Write specialization transformers`_ to help convert the code to C;
 - Write specialization transformers to use a platform (like OpenMP, OpenCL,
   CUDA, etc.);
-- Test Specializer
-
-
-Basic Concepts
-..............
-
-- **AST** Abstract Syntax Tree. A tree representation of a source code. This is
-  the way specializers modify and convert codes.
-- **JIT** Just in Time. Refers to the "just in time" compilation of the code.
-  A specializer JIT compiles (compiles just in time) part of the python code
-  specialized.
-- **Transformer** Same as Visitor with the difference that Transformers can
-  modify the tree they are traversing.
-- **Visitor** A class that traverses a tree and executes actions based on the
-  values of specific types of node, but without modifying them.
 
 
 Setup a Project
@@ -58,46 +44,14 @@ stands for *Start Project*::
 A directory with the project structure will be created inside the current
 directory, using the *ProjectName* you provided.
 
-For the A* we are calling the project *AStar*::
+For the A* we are calling the project *a_star*::
 
-    ctree -sp AStar
+    ctree -sp a_star
 
-
-Project Files
-.............
-Go into the directory created, *AStar*. You will notice that all the project
-structure is already created inside.
+Go into the directory created. The project structure should look like this:
 
 .. image:: images/project_files.png
    :width: 800px
-
-Here is a description of each file and directory purpose:
-
-- **AStar/** will be your project name, it is used to store the actual
-  specializer, inside there are already two files: **__init__.py** and
-  **main.py**;
-
-  - **__init__.py** is used to mark the directory as a Python package, you can
-    also put initialization code for your specializer package here;
-  - **main.py** is where we will put the main class for the specializer, if you
-    look inside the file you will see it already contains a class named *AStar*
-    inherited from *LazySpecializedFunction*, we will see more about this class
-    in the next sections;
-
-- **README.rst** should contain a brief explanation about what the specializer
-  do and how to use it, more detailed explanation should be placed in the doc
-  subdirectory;
-- **__init__.py** same purpose as the other __init__.py file;
-- **cache/** will be used by ctree for cache;
-- **doc/** contains the documentation files for the specializer;
-- **examples/** contains examples on applications and on how to use the
-  specializer;
-- **setup.py** is the setup for the specializer package, contains all the
-  dependencies used by the specializer;
-- **templates/** contains C code templates, more details about C templates will
-  be seen in the next sections;
-- **tests/** contains the specializer tests, usually in the form of python
-  *unittest*.
 
 
 Writing the Python Code to be Specialized
@@ -108,284 +62,306 @@ Writing the Python Code to be Specialized
    about the specializer, you may skip this section and return if you need more
    details about a specific python class.
 
+The python implementation should be placed in the ``a_star/a_star`` directory.
+
 First, to implement the A* algorithm we need a priority queue. Priority queues
 can be easily implemented on Python using the heapq library. An implementation
 of a Python priority queue can be seen below.
 
-.. PriorityQueue
-.. include:: ../AStarSpecializer/a_star.py
-   :start-line: 8
-   :end-before: class Node
-   :code: python
+.. _PriorityQueue:
 
-To make sure elements are ordered using the priority only, the *Node* class was
-created. A *Node* object has a priority and an id but uses only the priority
+.. code:: python
+
+    import heapq
+
+    class PriorityQueue(object):
+        """Implementation of a Priority Queue using a heap"""
+
+        def __init__(self):
+            self._heap = []
+
+        def push(self, item, priority=None):
+            """Insert item in the queue"""
+            if priority is not None:
+                item.set_priority(priority)
+            heapq.heappush(self._heap, item)
+
+        def pop(self):
+            return heapq.heappop(self._heap)
+
+        def __len__(self):
+            return len(self._heap)
+
+To make sure elements are ordered using the priority only, the Node_ class was
+created. A ``Node`` object has a priority and an id but uses only the priority
 for the __lt__ method.
 
-.. Node
-.. include:: ../AStarSpecializer/a_star.py
-   :start-line: 27
-   :end-before: class Graph
-   :code: python
+.. _Node:
 
-Now that we have the PriorityQueue set we may create the actual A* algorithm.
-For this we created the *Graph* class
+.. code:: python
 
-.. Graph
-.. include:: ../AStarSpecializer/a_star.py
-   :start-line: 38
-   :end-before: class BaseGrid
-   :code: python
+    class Node(object):
+        """Used to make the nodes ordered based on the priority only"""
 
-.. BaseGrid
-.. include:: ../AStarSpecializer/a_star.py
-   :start-line: 118
-   :end-before: class GridAsGraph
-   :code: python
+        def __init__(self, node_id, priority=None):
+            self.id = node_id
+            self.priority = priority
+
+        def __lt__(self, other):
+            return self.priority < other.priority
+
+Now that we have the ``PriorityQueue`` set we may implement the actual A*
+Algorithm. For this we created the Graph_ class:
+
+.. _Graph:
+
+.. code:: python
+
+    from collections import defaultdict
+    import numpy as np
+
+    class Graph(object):
+        """Graph class to be used with the A* algorithm"""
+
+        def __init__(self):
+            self._edges = {}
+
+        def get_neighbor_edges(self, node_id):
+            return self._edges[node_id]
+
+        def _get_neighbor_weight_list(self, node_id):
+            return self.get_neighbor_edges(node_id).iteritems()
+
+        def insert_edge(self, a, b, weight):
+            if a.get_id() in self._edges:
+                self._edges[a.get_id()][b.get_id()] = weight
+            else:
+                self._edges[a.get_id()] = {b.get_id(): weight}
+
+        def a_star(self, start_id, target_id):
+            nodes_info = defaultdict(self.NodeInfo)
+            open_list = PriorityQueue()
+            open_list.push(Node(start_id, 0))
+
+            start_info = self.NodeInfo()
+            start_info.f = 0
+            start_info.g = 0
+            nodes_info[start_id] = start_info
+
+            while len(open_list) > 0:
+                current_node = open_list.pop()
+                current_node_id = current_node.id
+
+                if current_node_id == target_id:
+                    break
+
+                current_node_info = nodes_info[current_node_id]
+                current_node_info.closed = True
+
+                for adj_node_id, adj_node_to_parent_weight in \
+                        self._get_neighbor_weight_list(current_node_id):
+                    adj_node_info = nodes_info[adj_node_id]
+
+                    if not adj_node_info.closed:
+                        g = current_node_info.g + adj_node_to_parent_weight
+                        if g < adj_node_info.g:
+                            adj_node_info.parent = current_node_id
+                            h = self._calculate_heuristic_cost(adj_node_id,
+                                                               target_id)
+                            adj_node_info.g = g
+                            adj_node_info.f = g + h
+                            open_list.push(Node(adj_node_id, adj_node_info.f))
+                            nodes_info[adj_node_id] = adj_node_info
+
+                nodes_info[current_node_id] = current_node_info
+
+            return nodes_info
+
+        def _calculate_heuristic_cost(self, current_node_id, target_node_id):
+            # no heuristics by default, works as Dijkstra's shortest path
+            return 0
+
+        class NodeInfo(object):
+            def __init__(self):
+                self.f = None
+                self.g = np.inf
+                self.parent = None
+                self.closed = False
+
+The ``Graph`` class has a generic implementation of the A* Algorithm for any
+kind of graph. The following class (BaseGrid_) subclasses the ``Graph``
+class for the specific case of grids.
+
+.. _BaseGrid:
+
+.. code:: python
+
+    import numpy as np
+
+    class BaseGrid(Graph):
+        """Base class for grids, implements grids heuristic"""
+
+        def __init__(self, grid):
+            """
+            Args:
+              grid (numpy.array): The any dimensions grid, the barriers are
+                represented by `numpy.inf`
+            """
+            super(BaseGrid, self).__init__()
+            self.grid_shape = grid.shape
+            self.identity_matrix = np.eye(len(self.grid_shape), dtype=int)
+
+        def _get_neighbors(self, grid, node_position):
+            no_filter_neighbors = list(np.concatenate(
+                (node_position - self.identity_matrix,
+                 node_position + self.identity_matrix)))
+
+            neighbors = filter(
+                lambda i: np.logical_and((i >= 0), (i < self.grid_shape)).all(),
+                no_filter_neighbors)
+
+            weighted_neighbors = []
+            for n in neighbors:
+                tuple_n = tuple(n)
+                weight = grid[tuple_n]
+                if weight != np.inf:
+                    weighted_neighbors.append((tuple_n, weight))
+            return weighted_neighbors
+
+        def _calculate_heuristic_cost(self, current_node_id, target_node_id):
+            # Using 1-norm
+            current_node_id = np.array(current_node_id)
+            target_node_id = np.array(target_node_id)
+            return self._calculate_1_norm(np_elementwise(
+                lambda x, y: x - y, current_node_id, target_node_id))
+
+        @staticmethod
+        def _calculate_1_norm(vector):
+            return np_reduce(lambda x, y: x + y,
+                             np_map(lambda z: -z if z < 0 else z, vector))
+
 
 .. GridAsArray
-.. include:: ../AStarSpecializer/a_star.py
-   :start-line: 189
-   :code: python
+.. code:: python
+
+    class GridAsArray(BaseGrid):
+        """ This class uses the grid as a numpy.array instead of a graph"""
+
+        def __init__(self, grid):
+            """
+            Args:
+              grid (numpy.array): The any dimensions grid to be used for the
+                A* algorithm, the barriers are represented by `numpy.inf`
+            """
+            super(GridAsArray, self).__init__(grid)
+            self._grid = grid
+
+        def insert_edge(self, a, b, weight):
+            raise NotImplementedError
+
+        def get_neighbor_edges(self, node_id):
+            return dict(self._get_neighbor_weight_list(node_id))
+
+        def _get_neighbor_weight_list(self, node_id):
+            return self._get_neighbors(self._grid, node_id)
 
 
-.. _`Write specialization transformers`:
+Create Tests
+------------
+This part is optional but is highly recommended as unit tests make the
+development process much easier.
 
-Specializing the A* code
-------------------------
-This section explains how to create a specializer from your python code. Here
+Our tests for the A* will compare the cost for both the path from the origin to
+the destination and from the destination to the origin. If our A* code is
+correct they must be the same. Note the paths may differ but they must have the
+same cost which should be minimal. This procedure doesn't prove the code
+correctness but helps tracking errors.
+
+First we create a function to generate random grids:
+
+.. code:: python
+
+    def get_random_grid(dimension, barrier_probability=0.3):
+        generate_barriers = np.vectorize(lambda i: np.inf
+            if i < barrier_probability else np.rint(i*1000)+1)
+        grid_array = generate_barriers(np.random.rand(*dimension))
+
+        start = tuple(np.random.random_integers(0, i - 1) for i in dimension)
+        finish = tuple(np.random.random_integers(0, i - 1) for i in dimension)
+
+        grid_array[start] = 1
+        grid_array[finish] = 1
+        return Grid(grid_array), start, finish
+
+Here ``dimension`` is a tuple with the grid dimensions, it can have any number
+of dimensions. This grid has some tiles with infinity cost that we called
+"barriers". If the tile is not a "barrier" it will have a random integer cost
+associated with it.
+
+Now that we have random grids to test our code, we can write the actual
+unittest:
+
+.. code:: python
+
+    class TestAStar(unittest.TestCase):
+        def __init__(self, *args, **kwargs):
+            super(TestAStar, self).__init__(*args, **kwargs)
+            self.grid_size = (10, 10, 10)
+
+        def test_random_grid(self):
+            grid, start, finish = get_random_grid(self.grid_size)
+            start_finish_cost = get_a_star_cost(grid, start, finish)
+            finish_start_cost = get_a_star_cost(grid, finish, start)
+
+            self.assertEqual(start_finish_cost, finish_start_cost)
+
+        def test_many_random_grids(self):
+            for i in xrange(100):
+                self.test_random_grid()
+
+We're using a function ``get_a_star_cost`` to get the cost of the path found by
+the A* Algorithm. This function is implemented as follow:
+
+.. code:: python
+
+    def get_a_star_cost(graph, start, finish):
+        path_trace = graph.a_star(start, finish)
+
+        if tuple(finish) not in path_trace:
+            return None
+
+        cost = 0
+        current_node = finish
+
+        while tuple(current_node) != tuple(start):
+            current_parent = path_trace[tuple(current_node)].parent
+            cost += graph.get_neighbor_edges(current_parent)[tuple(current_node)]
+            current_node = current_parent
+
+        return cost
+
+Now we are done with both the python side implementation of the A* and the
+unittest for it. It's time to specialize.
+
+Write Specialization Transformers
+---------------------------------
+This section explains how to create a specializer for your python code. Here
 we create the specializer for the A* Algorithm, but the steps will be similar
 to what you need to do for your own specializer.
 
-The Structure of a Specializer
-..............................
-
-A Specializer has two main classes, one inherited from the
-``LazySpecializedFunction`` and the other inherited from the
-``ConcreteSpecializedFunction``.
-
-The ``LazySpecializedFunction`` will wait until the last moment before
-specializing the function. You may wonder why to do that, it turns out that,
-for a specializer, the last moment can be the best moment. Since you're
-specializing in the last moment, your specialized function may be
-created for a specific parameter type and also tuned for a specific data
-structure size. For the A* specializer, the specialized function will change
-according to the grid dimensions and the type of the elements.
-
-The ``ConcreteSpecializedFunction`` is the already specialized and compiled
-function.
-
-To start, lets create a really simple specializer.
-
-Fibonacci Specializer
-`````````````````````
-We will start by creating the fibonacci function in python.
-
-.. code:: python
-
-    def fib(n):
-        if n < 2:
-            return n
-        else:
-            return fib(n - 1) + fib(n - 2)
-
-That's the function we will specialize. To do it, we will write the two
-required classes. The first can be seen below.
-
-.. code:: python
-
-    import ctypes
-    from ctree.types import get_ctype
-    from ctree.nodes import Project
-    from ctree.c.nodes import FunctionDecl, CFile
-    from ctree.transformations import PyBasicConversions
-    from ctree.jit import LazySpecializedFunction
-
-    class BasicTranslator(LazySpecializedFunction):
-
-        def args_to_subconfig(self, args):
-            return {'arg_type': type(get_ctype(args[0]))}
-
-        def transform(self, tree, program_config):
-            tree = PyBasicConversions().visit(tree)
-
-            fib_fn = tree.find(FunctionDecl, name="apply")
-            arg_type = program_config.args_subconfig['arg_type']
-            fib_fn.return_type = arg_type()
-            fib_fn.params[0].type = arg_type()
-            c_translator = CFile("generated", [tree])
-
-            return [c_translator]
-
-        def finalize(self, transform_result, program_config):
-            proj = Project(transform_result)
-
-            arg_config, tuner_config = program_config
-            arg_type = arg_config['arg_type']
-            entry_type = ctypes.CFUNCTYPE(arg_type, arg_type)
-
-            return BasicFunction("apply", proj, entry_type)
-
-Observe the ``BasicTranslator`` is inherited from ``LazySpecializedFunction``
-class. To use the ``LazySpecializedFunction`` we import it from ``ctree.jit``.
-We are overriding three methods:
-
-.. _`args_to_subconfig`:
-
-- **args_to_subconfig** This method receives the arguments that are being
-  passed to the function we are specializing (``fib``). What is returned from
-  this method will be placed on the ``program_config`` parameter passed to the
-  transform_ method. This is very important as the ``program_config`` is what
-  determines if a new specialized function must be created or if an already
-  existing one can be used.
-
-  Observe we return a dictionary that contains the type of the first argument
-  passed to the function. When we call the ``fib`` function from python using
-  an integer argument, the returned dictionary will contain the type integer.
-  If we call the function again with another integer it knows it was already
-  specialized for the integer type and will use the cached version. In the
-  other hand, if we call ``fib`` with a different type, this will be detected
-  and a new specialized function for this type will be created. Also observe
-  that, to get the type, we used two functions: ``type`` and ``get_ctype``.
-  ``type`` is a built-in python function to get the type. ``get_ctype`` can be
-  found on ``ctree.types`` and returns the closest C type instance
-  corresponding to the object. You need to use both functions.
-
-.. _transform:
-
-- **transform** Here is where the function transformations happen. This method
-  has two parameters: ``tree`` and ``program_config``. ``tree`` is the function
-  we are specializing converted to AST. ``program_config`` is a ``namedtuple``
-  with two fields:
-
-  - ``args_subconfig`` the dictionary returned by the `args_to_subconfig`_
-    method;
-  - ``tuner_subconfig`` contains tuning specific configurations. We are not
-    using tuner here.
-
-  For this very simple specializer we are using only a single transformer, the
-  ``PyBasicConversions`` transformer. This transformer converts python code
-  with obvious C analogues to C, you can import it from
-  ``ctree.transformations``. It's important to notice the way the transformer
-  is used. We instantiate the transformer class and then call the visit method
-  passing the AST. This is the way most transformers are used. Since we only
-  have a simple python code with obvious C analogues, this transformation is
-  enough to transform the entire function to C.
-
-  Next step is to convert the function return and parameters to C. The function
-  we are specializing (``fib``) has its name automatically changed to ``apply``
-  when being converted to AST. We can easily find the function we're
-  specializing by looking for the ``apply`` function in the AST. We do this
-  with the ``find`` method. In the line
-  ``tree.find(FunctionDecl, name="apply")`` we're looking for a node with type
-  ``FunctionDecl`` that has an attribute ``name`` with the string ``"apply"``,
-  which is our function. We know the parameter type already as we got it in the
-  `args_to_subconfig`_ method. For this function, the type of the parameter
-  will be the same as the return. This is what we do in the following lines:
-  get the parameter type from the program_config, attribute this type to the
-  function ``return_type`` and to the first parameter of the function. One
-  thing that may be tricky is that the ``arg_type`` we got is of *type*
-  ``type`` while the function return and parameters we're assigning need an
-  *instance* of this type, not the type itself. That is the reason we use
-  parenthesis after ``arg_type`` when assigning the return and parameter type.
-
-  The last step in the ``transform`` method is to put the tree in a ``CFile``,
-  this is a node that represents a ``.c`` file and is what the ``transform``
-  method should return. We give the ``CFile`` the name ``"generated"`` and pass
-  the tree we generated to it. A list containing the ``CFile`` is finally
-  returned.
-
-.. _finalize:
-
-- **finalize** This is the last thing done by the ``LazySpecializedFunction``.
-  This method has two parameters: ``transform_result`` and ``program_config``.
-  ``transform_result`` is what was returned by the ``transform``, the list with
-  the ``CFile`` we created. ``program_config`` is the same parameter as in the
-  ``transform`` method. The ``finalize`` is responsible for returning a
-  ``ConcreteSpecializedFunction``. The code for BasicFunction_, the class that
-  inherits from ``ConcreteSpecializedFunction`` will be seen below but it
-  requires an entry name, a ``Project`` and an entry type. The entry name is
-  the name of the function we want the interface with, here it's ``"apply"``. A
-  ``Project`` is used to pack all the CFiles in your project, in this case just
-  one. The entry type is the interface between python and the C function
-  created.
-
-  The ``Project`` class can be imported from ``ctree.nodes`` and it can be used
-  as shown in the example, using the list of ``CFile`` as argument. To create
-  the entry type we need to use the function ``CFUNCTYPE`` from the module
-  ``ctypes``. The first parameter of this function is the return type, the
-  following parameters are the parameter types.
-
-.. _BasicFunction:
-
-The implementation of the ``BasicFunction`` is simple, we need two methods:
-``__init__`` and ``__call__``. The code can be seen below.
-
-.. code:: python
-
-    from ctree.jit import ConcreteSpecializedFunction
-
-    class BasicFunction(ConcreteSpecializedFunction):
-        def __init__(self, entry_name, project_node, entry_typesig):
-            self._c_function = self._compile(entry_name, project_node, entry_typesig)
-
-        def __call__(self, *args, **kwargs):
-            return self._c_function(*args, **kwargs)
-
-
-The ``__init__`` receives all the arguments we saw in the finalize_ method from
-the ``LazySpecializedFunction`` and assigns a compiled function to a class
-attribute. This is done so that the ``__call__`` method can use this compiled
-function with the arguments given when calling a ``BasicFunction`` instance.
-
-The Fibonacci Specializer is ready. To use the specializer we just have to call
-the method ``from_function`` as shown below.
-
-.. code:: python
-
-    c_fib = BasicTranslator.from_function(fib)
-
-This returns the specialized version of the function ``fib`` using our
-specializer ``BasicTranslator``. Now we can use ``c_fib`` as we would use
-``fib``.
-
-.. code:: python
-
-    print c_fib(10), fib(10)
-    print c_fib(4.5), fib(4.5)
-
-If everything went right this should display::
-
-    55 55
-    5.5 5.5
-
-The left numbers were calculated using the specialized function and are the
-same as the right, calculated using the regular python function. Since we used
-arguments with different types in each call, two different specialized
-functions were generated.
-
-To see the source code generated we can enable logging by adding the following
-lines to the beginning of the file:
-
-.. code:: python
-
-    import logging
-    logging.basicConfig(level=20)
-
-This will show a lot of information when running the code, including the source
-code generated for the integer type and for the float type.
-
+If you open the ``main.py`` file on ``a_star/a_star/`` you will see it looks
+like this:
 
 .. code:: python
 
     """
-    specializer AStar
+    specializer a_star
     """
 
     from ctree.jit import LazySpecializedFunction
 
 
-    class AStar(LazySpecializedFunction):
+    class a_star(LazySpecializedFunction):
 
         def transform(self):
             pass
@@ -394,4 +370,8 @@ code generated for the integer type and for the float type.
         pass
 
 
-Next sections should also contain: LazySpecializedFunction, C templates
+
+
+
+
+Next sections should also contain: C templates
