@@ -165,6 +165,8 @@ class MethodCallsTransformer(NodeTransformer):
                     func_def = get_ast(getattr(self.self_object, func.attr))
                     func_def = func_def.body[0]
                     func_def.name = func_name
+
+                    #### TODO check
                     # func_def = self.functions_transformer.visit(func_def)
                     # self.lifted_func_names.add(func_name)
                     # self.lift.append(func_def)
