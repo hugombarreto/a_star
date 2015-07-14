@@ -153,11 +153,11 @@ class BaseGrid(Graph):
         return self._calculate_1_norm(np_elementwise(
             lambda x, y: x - y, current_node_id, target_node_id))
 
-    @staticmethod
-    def _calculate_p_norm(p, vector):
-        return np_reduce(lambda x, y: x + y,
-                         np_map(lambda z: -z if z < 0 else z,
-                                vector) ** p) ** (1. / p)
+    # @staticmethod
+    # def _calculate_p_norm(p, vector):
+    #     return np_reduce(lambda x, y: x + y,
+    #                      np_map(lambda z: -z if z < 0 else z,
+    #                             vector) ** p) ** (1. / p)
 
     @staticmethod
     def _calculate_1_norm(vector):
