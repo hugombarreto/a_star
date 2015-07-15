@@ -146,23 +146,16 @@ class BaseGrid(Graph):
                 weighted_neighbors.append((tuple_n, weight))
         return weighted_neighbors
 
-    def _calculate_heuristic_cost(self, current_node_id, target_node_id):
+    def _calculate_heuristic_cost(current_node_id, target_node_id):
         # Using 1-norm
-        current_node_id = np.array(current_node_id)
-        target_node_id = np.array(target_node_id)
-        return self._calculate_1_norm(np_elementwise(
-            lambda x, y: x - y, current_node_id, target_node_id))
+        current_node_id_array = np.array(current_node_id)
+        target_node_id_array = np.array(target_node_id)
+        coordinates_difference = np_elementwise(lambda x, y: x - y,
+                                                current_node_id_array,
+                                                target_node_id_array)
 
-    # @staticmethod
-    # def _calculate_p_norm(p, vector):
-    #     return np_reduce(lambda x, y: x + y,
-    #                      np_map(lambda z: -z if z < 0 else z,
-    #                             vector) ** p) ** (1. / p)
-
-    @staticmethod
-    def _calculate_1_norm(vector):
-        return np_reduce(lambda x, y: x + y,
-                         np_map(lambda z: -z if z < 0 else z, vector))
+        return np_reduce(lambda x, y: x + y, np_map(
+            lambda z: -z if z < 0 else z, coordinates_difference))
 
 
 class GridAsGraph(BaseGrid):
