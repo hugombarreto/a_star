@@ -3,7 +3,7 @@ from ctree.c.nodes import *
 from ctree.templates.nodes import StringTemplate
 from AStarSpecializer.generic_transformers import ClassToStructureTransformer
 
-substitute_priority_queue = ClassToStructureTransformer(
+transform_priority_queue = ClassToStructureTransformer(
     "PriorityQueue",
     [
         SymbolRef("array", Struct("heap_element", ptr=True)),
@@ -14,7 +14,7 @@ substitute_priority_queue = ClassToStructureTransformer(
     pointer=True
 )
 
-substitute_node_info = ClassToStructureTransformer(
+transform_node_info = ClassToStructureTransformer(
     "NodeInfo",
     [
         SymbolRef('f', ctypes.c_double()),
@@ -69,6 +69,28 @@ class PriorityQueueInterface(object):
                 element.priority = priority;
                 return element;""")
                   ]
+        ),
+        "np_array": FunctionDecl(  # FIXME memory leak by returning pointer
+            return_type=ctypes.POINTER(ctypes.c_int)(),
+            name="np_array",
+            params=[SymbolRef("coordinate", ctypes.c_int())],
+            defn=[StringTemplate("""\
+                int dimension_multiplier = 1;
+                int grid_dimensions[] = GRID_DIMENSIONS;
+                int* multiple_coordinate;
+                if ((multiple_coordinate = malloc(NUM_DIMENSIONS * sizeof(*multiple_coordinate))) == NULL) {
+                    return NULL;
+                }
+
+                for (int i = 0; i < NUM_DIMENSIONS; ++i) {
+                    int new_dimension_multiplier = dimension_multiplier * grid_dimensions[i];
+                    int multiplied_term = coordinate % new_dimension_multiplier;
+                    multiple_coordinate[i] = multiplied_term / dimension_multiplier;
+                    dimension_multiplier = new_dimension_multiplier;
+                    coordinate -= multiplied_term;
+                }
+                return multiple_coordinate;
+            """)]
         ),
         "len": FunctionDecl(
             return_type=np.uintc(),
