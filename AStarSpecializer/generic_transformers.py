@@ -6,33 +6,28 @@ from ctree.cpp.nodes import CppDefine
 from ctree.transformations import PyBasicConversions
 
 
-class FunctionsLifter(NodeTransformer):
+class LambdaLifter(NodeTransformer):
     lambda_counter = 0
 
-    def __init__(self):
-        self._lifted_functions = []
-
-    def visit_FunctionDef(self, node):
-        self.generic_visit(node)
-        self._lifted_functions.append(PyBasicConversions().visit(node))
-        return None
+    def __init__(self, recursive_specializer=None):
+        self.lifted_functions = []
+        self.recursive_specializer = recursive_specializer
 
     def visit_Lambda(self, node):
         if isinstance(node, ast.Lambda):
             self.generic_visit(node)
             macro_name = "LAMBDA_" + str(self.lambda_counter)
-            self.lambda_counter += 1
+            LambdaLifter.lambda_counter += 1
             node = PyBasicConversions().visit(node)
             node.name = macro_name
             macro = CppDefine(macro_name, node.params, node.defn[0].value)
-            self._lifted_functions.append(macro)
+            self.lifted_functions.append(macro)
+            if self.recursive_specializer is not None:
+                self.recursive_specializer.defines.append(macro)
 
             return SymbolRef(macro_name)
         else:
             return node
-
-    def get_lifted_functions(self):
-        return self._lifted_functions
 
 
 class ClassToStructureTransformer(NodeTransformer):
@@ -79,9 +74,7 @@ class ClassToStructureTransformer(NodeTransformer):
         return node
 
     def visit_Call(self, node):
-        if isinstance(node.func, ast.Attribute):
-            pass
-        else:
+        if not isinstance(node.func, ast.Attribute):
             self.generic_visit(node)
         return node
 
@@ -101,20 +94,9 @@ class CompleteAttrName(NodeVisitor):
         self.complete_name += "." + node.attr
 
 
-class MethodCallsTransformer(NodeTransformer):
-    def __init__(self, func_implementations=None, self_object=None,
-                 functions_transformer=None):
+class TypeTrackingTransformer(NodeTransformer):
+    def __init__(self):
         self.variable_types = {}
-        self.lift = []
-        self.lifted_func_names = set()
-        self.func_implementations = func_implementations or {}
-        self.object_methods = []
-        if self_object is not None:
-            for attr in dir(self_object):
-                if hasattr(getattr(self_object, attr), '__call__'):
-                    self.object_methods.append(attr)
-        self.self_object = self_object
-        self.functions_transformer = functions_transformer
 
     def visit_Assign(self, node):
         """Keeps track of the variable types"""
@@ -132,20 +114,36 @@ class MethodCallsTransformer(NodeTransformer):
             elif isinstance(target, ast.Attribute):
                 attr_name = CompleteAttrName().get_complete_name(node)
             if attr_name is not None:
-                if not isinstance(node_type, str):
-                    node_type = str(node_type)
                 self.variable_types[attr_name] = node_type
         return node
 
     def visit_SymbolRef(self, node):
         if node.type is not None:
-            node_type = node.type.get_type()
-            if ' ' in node_type:
-                node_type = node_type.split(' ')[-1]
-            if node_type[-1] == "*":
-                node_type = node_type[0:-1]
+            node_type = node.type
             self.variable_types[node.name] = node_type
         return node
+
+    def get_type_str(self, object_name):
+        type_str = str(self.variable_types[object_name])
+        if ' ' in type_str:
+            type_str = type_str.split(' ')[-1]
+        if type_str[-1] == "*":
+            type_str = type_str[0:-1]
+
+        return type_str
+
+
+class MethodCallsTransformer(TypeTrackingTransformer):
+    def __init__(self, recursive_specializer=None):
+        super(MethodCallsTransformer, self).__init__()
+        self.object_methods = []
+        self_object = recursive_specializer.self_object
+        if self_object is not None:
+            for attr in dir(self_object):
+                if hasattr(getattr(self_object, attr), '__call__'):
+                    self.object_methods.append(attr)
+        self.self_object = self_object
+        self.recursive_specializer = recursive_specializer
 
     def visit_Call(self, node):
         self.generic_visit(node)
@@ -153,7 +151,8 @@ class MethodCallsTransformer(NodeTransformer):
         if isinstance(func, ast.Attribute):
             object_name = func.value.id
             if object_name in self.variable_types:
-                func_name = self.variable_types[object_name] + "_" + func.attr
+                func_name = str(self.get_type_str(object_name)) + "_" + \
+                            func.attr
                 node = FunctionCall(SymbolRef(func_name),
                                     [SymbolRef(object_name)] + node.args)
             elif object_name == 'self':
@@ -161,23 +160,22 @@ class MethodCallsTransformer(NodeTransformer):
                     raise NotImplementedError("Method from self object was not"
                                               " found (%s)" % func.attr)
                 func_name = "self_" + func.attr
-                if func_name not in self.lifted_func_names:
+                if func_name not in self.recursive_specializer.func_def_names:
                     func_def = get_ast(getattr(self.self_object, func.attr))
                     func_def = func_def.body[0]
                     func_def.name = func_name
 
-                    #### TODO check
-                    # func_def = self.functions_transformer.visit(func_def)
-                    # self.lifted_func_names.add(func_name)
-                    # self.lift.append(func_def)
+                    # TODO check
+                    func_def = self.recursive_specializer.visit(func_def)
+                    self.recursive_specializer.func_defs.append(func_def)
+                    self.recursive_specializer.func_def_names.append(func_name)
 
                 node = FunctionCall(SymbolRef(func_name), node.args)
             else:
                 func_name = object_name + "_" + func.attr
                 node = FunctionCall(SymbolRef(func_name), node.args)
 
-            if func_name not in self.lifted_func_names:
-                self.lifted_func_names.add(func_name)
+            if func_name not in self.recursive_specializer.func_def_names:
                 params = []
                 generic_att_cntr = 0
                 for param in node.args:
@@ -185,7 +183,41 @@ class MethodCallsTransformer(NodeTransformer):
                         param = SymbolRef('attr' + str(generic_att_cntr))
                     params.append(param)
                     generic_att_cntr += 1
-                if func_name not in self.func_implementations:
-                    self.lift.append(FunctionDecl(None, func_name,
-                                                  params=params, defn=None))
+
+                self.recursive_specializer.func_defs.append(
+                    FunctionDecl(None, func_name, params=params, defn=None))
+                self.recursive_specializer.func_def_names.append(func_name)
         return node
+
+
+class ReturnTypeFinder(TypeTrackingTransformer):
+    def __init__(self, recursive_specializer=None):
+        super(ReturnTypeFinder, self).__init__()
+        self.recursive_specializer = recursive_specializer
+        self.return_type = None
+
+    def visit_Return(self, node):
+        if node.value is None:
+            return node
+
+        attr_name = None
+
+        if isinstance(node.value, FunctionCall):
+            name = node.value.func.name
+            funcs = self.recursive_specializer.func_defs
+            ret = next((f.return_type for f in funcs if f.name == name), None)
+            self.return_type = ret
+        elif hasattr(node.value, 'id'):
+            attr_name = node.value.id
+        elif isinstance(node.value, ast.Attribute):
+            attr_name = CompleteAttrName().get_complete_name(node)
+        elif isinstance(node.value, Constant):
+            self.return_type = node.value.value
+        else:
+            self.return_type = node.value
+
+        if attr_name is not None:
+            self.return_type = self.variable_types[attr_name]
+
+        return node
+

@@ -104,7 +104,8 @@ class Graph(object):
                     open(directory + file_name, "wb"))
         print 'saved: "' + directory + file_name + '"'
 
-    def _calculate_heuristic_cost(self, current_node_id, target_node_id):
+    @staticmethod
+    def _calculate_heuristic_cost(current_node_id, target_node_id):
         # no heuristics by default, works as Dijkstra's shortest path
         return 0
 
@@ -127,13 +128,12 @@ class BaseGrid(Graph):
         """
         super(BaseGrid, self).__init__()
         self.grid_shape = grid.shape
-        self.identity_matrix = np.eye(len(self.grid_shape), dtype=int)
+        identity_matrix = np.eye(len(self.grid_shape), dtype=int)
+        self.neighborhood_matrix = np.concatenate((-identity_matrix,
+                                                   identity_matrix))
 
     def _get_neighbors(self, grid, node_position):
-        no_filter_neighbors = list(np.concatenate(
-            (node_position - self.identity_matrix,
-             node_position + self.identity_matrix)))
-
+        no_filter_neighbors = list(node_position + self.neighborhood_matrix)
         neighbors = filter(
             lambda i: np.logical_and((i >= 0), (i < self.grid_shape)).all(),
             no_filter_neighbors)
@@ -146,6 +146,7 @@ class BaseGrid(Graph):
                 weighted_neighbors.append((tuple_n, weight))
         return weighted_neighbors
 
+    @staticmethod
     def _calculate_heuristic_cost(current_node_id, target_node_id):
         # Using 1-norm
         current_node_id_array = np.array(current_node_id)
