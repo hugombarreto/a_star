@@ -25,16 +25,18 @@ def np_elementwise(function, array1, array2):
 
 
 class TransformFunctionalNP(NodeTransformer):
-    def __init__(self, array_type):
+    def __init__(self, array_type, recursive_specializer=None):
         self.array_type = array_type
         self.inner_type = self.array_type._dtype_.type()
         self.specialized_functions = []
+        self.recursive_specializer = recursive_specializer
 
-    def visit_FunctionCall(self, node):
+    def visit_Call(self, node):
+        #self.generic_visit(node)
         if isinstance(node.func, Attribute):
             return node
 
-        func_name = node.func.name
+        func_name = node.func.id
         print "Node: ", node, ", name: ", func_name
         if func_name not in np_functional_functions:
             return node
@@ -111,7 +113,14 @@ class TransformFunctionalNP(NodeTransformer):
             return_type = None
             defn = None
 
-        self.specialized_functions.append(FunctionDecl(
-            return_type, specialized_func_name, params=params, defn=defn))
-        tree = FunctionCall(SymbolRef(specialized_func_name), [args[1]])
+        func_decl = FunctionDecl(
+            return_type, specialized_func_name, params=params, defn=defn)
+
+        self.specialized_functions.append(func_decl)
+        if self.recursive_specializer is not None and specialized_func_name not\
+                in self.recursive_specializer.func_def_names:
+            self.recursive_specializer.func_defs.append(func_decl)
+            self.recursive_specializer.func_def_names.append(
+                specialized_func_name)
+        tree = FunctionCall(SymbolRef(specialized_func_name), args[1:])
         return tree
