@@ -209,6 +209,8 @@ class ReturnTypeFinder(TypeTrackingTransformer):
             self.return_type = ret
         elif hasattr(node.value, 'id'):
             attr_name = node.value.id
+        elif hasattr(node.value, 'name'):
+            attr_name = node.value.name
         elif isinstance(node.value, ast.Attribute):
             attr_name = CompleteAttrName().get_complete_name(node)
         elif isinstance(node.value, Constant):
