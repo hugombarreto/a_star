@@ -1,6 +1,4 @@
 from collections import defaultdict
-import pickle
-from os import listdir
 import heapq
 import numpy as np
 from AStarSpecializer.np_functional import np_map, np_reduce, np_elementwise
@@ -92,17 +90,6 @@ class Graph(object):
             nodes_info[current_node_id] = current_node_info
 
         return nodes_info
-
-    def save(self, file_prefix, directory, start_node=None, end_node=None):
-        file_name = file_prefix + ".p"
-        files_in_directory = listdir(directory)
-        file_counter = 2
-        while file_name in files_in_directory:
-            file_name = file_prefix + str(file_counter) + ".p"
-            file_counter += 1
-        pickle.dump((self, start_node, end_node),
-                    open(directory + file_name, "wb"))
-        print 'saved: "' + directory + file_name + '"'
 
     @staticmethod
     def _calculate_heuristic_cost(current_node_id, target_node_id):

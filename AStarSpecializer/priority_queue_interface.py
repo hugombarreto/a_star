@@ -22,7 +22,7 @@ transform_node_info = ClassToStructureTransformer(
         SymbolRef('parent', ctypes.c_int()),
         SymbolRef('closed', ctypes.c_int())
     ],
-    initial_values=[0, np.inf, 0, 0],
+    initial_values=[0, np.inf, -1, 0],
     self_defined=True
 )
 
@@ -38,7 +38,7 @@ class PriorityQueueInterface(object):
             return_type=Struct("PriorityQueue", ptr=True),
             name="PriorityQueue_init",
             params=None,
-            # TODO properly determine the heap size
+            # FIXME properly determine the heap size
             defn=[Return(FunctionCall(SymbolRef("new_heap"), [Constant(10)]))]
         ),
         "PriorityQueue_push": FunctionDecl(

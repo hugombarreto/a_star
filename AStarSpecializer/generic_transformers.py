@@ -165,7 +165,6 @@ class MethodCallsTransformer(TypeTrackingTransformer):
                     func_def = func_def.body[0]
                     func_def.name = func_name
 
-                    # TODO check
                     func_def = self.recursive_specializer.visit(func_def)
                     self.recursive_specializer.func_defs.append(func_def)
                     self.recursive_specializer.func_def_names.append(func_name)

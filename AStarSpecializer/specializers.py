@@ -13,10 +13,11 @@ import logging
 from AStarSpecializer.generic_transformers import LambdaLifter,\
     MethodCallsTransformer, ReturnTypeFinder
 from AStarSpecializer.np_functional import TransformFunctionalNP
-from AStarSpecializer.priority_queue_interface import transform_priority_queue,\
-    transform_node_info, PriorityQueueInterface
+from AStarSpecializer.priority_queue_interface import transform_priority_queue
+from AStarSpecializer.priority_queue_interface import transform_node_info, \
+    PriorityQueueInterface
 
-logging.basicConfig(level=logging.DEBUG)
+#logging.basicConfig(level=logging.DEBUG)
 
 
 class DictToArrayTransformer(NodeTransformer):
@@ -95,19 +96,104 @@ class PySpecificAStarConversions(NodeTransformer):
         return node
 
 
+class NeighborWeightListConverter(object):
+    def __init__(self, rec_specializer):
+        self.rec_specializer = rec_specializer
+        self.self_object = rec_specializer.self_object
+        self.grid_shape = rec_specializer.grid_type._shape_
+        self.grid_dim = rec_specializer.grid_type._ndim_
+        self.max_index = reduce(lambda x,y: x*y, self.grid_shape) - 1
+        self.num_neighbors = self._get_number_neighbors()
+        self.func_name = "self__get_neighbor_weight_list"
+
+    def visit(self, tree):
+        if self.func_name not in self.rec_specializer.func_def_names:
+            self._add_function()
+        return tree
+
+    def _add_function(self):
+        neighbor_differences = self._get_neighbor_differences()
+        body = [ArrayDef(SymbolRef("neighbor_differences", ctypes.c_int()),
+                         self.num_neighbors,
+                         Array(ctypes.c_int(), None, neighbor_differences)),
+                Assign(SymbolRef("neighbor_index", ctypes.c_int()),
+                       Constant(0)),
+                For(Assign(SymbolRef("i", ctypes.c_int()), Constant(0)),
+                    Lt(SymbolRef("i"), Constant(self.num_neighbors)),
+                    PreInc(SymbolRef("i")),
+                    [
+                        Assign(SymbolRef("neighbor", ctypes.c_int()),
+                               Add(SymbolRef("node"),
+                                   ArrayRef(SymbolRef("neighbor_differences"),
+                                            SymbolRef("i")))),
+                        If(Or(Lt(SymbolRef("neighbor"), Constant(0)),
+                              Gt(SymbolRef("neighbor"),
+                                 Constant(self.max_index))),
+                           Continue()),
+                        Assign(ArrayRef(SymbolRef("neighbors"),
+                                        PostInc(SymbolRef("neighbor_index"))),
+                               SymbolRef("neighbor"))
+                    ]),
+                Return(SymbolRef("neighbors"))
+                ]
+        func_decl = FunctionDecl(return_type=ctypes.POINTER(ctypes.c_int)(),
+                                 name=self.func_name,
+                                 params=[
+                                     SymbolRef("neighbors",
+                                               ctypes.POINTER(ctypes.c_int)()),
+                                     SymbolRef("node", ctypes.c_int())
+                                 ],
+                                 defn=body)
+
+        self.rec_specializer.func_defs.append(func_decl)
+        self.rec_specializer.func_def_names.append(self.func_name)
+
+    def _get_neighbor_differences(self):
+        neighborhood_matrix = self.self_object.neighborhood_matrix
+        grid_multiplier = self._get_grid_multiplier()
+        neighbor_differences = list(neighborhood_matrix.dot(grid_multiplier))
+        return map(lambda x: Constant(x), neighbor_differences)
+
+    def _get_number_neighbors(self):
+        neighborhood_matrix = self.self_object.neighborhood_matrix
+        return neighborhood_matrix.shape[0]
+
+    def _get_grid_multiplier(self):
+        grid_multiplier = [1]
+        mult_accumulator = 1
+        for m in reversed(self.grid_shape[1:]):
+            mult_accumulator *= m
+            grid_multiplier.append(mult_accumulator)
+
+        return np.array(grid_multiplier[::-1])
+
+
+class NodesInfoTransformer(NodeTransformer):
+    def __init__(self, recursive_specializer):
+        super(NodesInfoTransformer, self).__init__()
+        self.recursive_specializer = recursive_specializer
+        self.grid_type = recursive_specializer.grid_type
+
+    def visit_Return(self, node):
+        if isinstance(node.value, ast.Name):
+            if node.value.id == "nodes_info":
+                node = self._get_new_return()
+        return node
+
+    def _get_new_return(self):
+        return MultiNode([StringTemplate("""\
+            if (nodes_info[target_id].parent > 0) {
+                for(int i = target_id; i != start_id; i = nodes_parent[i]) {
+                    nodes_parent[i] = nodes_info[i].parent;
+                }
+            }
+        """), Assign(SymbolRef("nodes_parent_temp", self.grid_type()),
+                     SymbolRef("nodes_parent")),
+              Return(SymbolRef("nodes_parent_temp"))])
+
+
 def get_func_declarations():
-    dec = PriorityQueueInterface.functions
-    dec.update({
-        # TODO remove the temporary self functions below
-        "self__get_neighbor_weight_list": FunctionDecl(
-            return_type=ctypes.POINTER(ctypes.c_int)(),
-            name="self__get_neighbor_weight_list",
-            params=[SymbolRef("neighbors", ctypes.POINTER(ctypes.c_int)()),
-                    SymbolRef("node", ctypes.c_int())],
-            defn=[StringTemplate("""return NULL;""")]
-        ),
-    })
-    return dec
+    return PriorityQueueInterface.functions
 
 
 # TODO find out why g is not getting the type properly
@@ -118,11 +204,6 @@ class fixGType(NodeTransformer):
                 node.targets[0] = SymbolRef("g", ctypes.c_double())
         return node
 
-    # FIXME return type should be answer
-    def visit_Return(self, node):
-        if isinstance(node.value, ast.Name):
-            return Return(Constant(np.int32()))
-        return node
 
 class RecursiveSpecializer(object):
     """Specializes a body and all the eventual methods called from it"""
@@ -156,17 +237,20 @@ class RecursiveSpecializer(object):
 
         LambdaLifter(self).visit(body)
 
-        coord_type = np.ctypeslib.ndpointer(ctypes.c_int, 1, (self.grid_type._ndim_))
+        coord_type = np.ctypeslib.ndpointer(ctypes.c_int, 1,
+                                            self.grid_type._ndim_)
         TransformFunctionalNP(coord_type, self).visit(body)
 
-        dict_to_array_transformer = DictToArrayTransformer(self.grid_type,
-                                                           self.typedef)
-        body = dict_to_array_transformer.visit(body)
+        DictToArrayTransformer(self.grid_type, self.typedef).visit(body)
+
+        NeighborWeightListConverter(self).visit(body)
 
         MethodCallsTransformer(self).visit(body)
 
         py_specific = PySpecificAStarConversions(self.grid_type)
         body = py_specific.visit(body)
+
+        NodesInfoTransformer(self).visit(body)
 
         body = fixGType().visit(body)
 
@@ -182,25 +266,32 @@ class RecursiveSpecializer(object):
 
         return body
 
-    def get_c_file(self, return_type, param_types):
+    def get_c_file(self, param_types, return_type=None):
         for param, param_type in zip(self.body.params, param_types):
             param.type = param_type
+
+        if return_type is not None:
+            self.body.return_type = return_type
 
         complete_list = self.includes + self.defines + self.typedef + \
                         self.local_include + self.func_defs + \
                         [self.body]
-        return CFile("generated", complete_list, path="/Users/hugo/Desktop")
+        return CFile("generated", complete_list)
 
 
 class AStarSpecializer(LazySpecializedFunction):
     def args_to_subconfig(self, args):
         grid = args[0]
         grid_type = np.ctypeslib.ndpointer(grid.dtype, grid.ndim, grid.shape)
-        self.self_object = args[3]
+        self.self_object = args[4]
         return {'grid_type': grid_type}
 
     def transform(self, py_ast, program_config):
         grid_type = program_config.args_subconfig['grid_type']
+
+        # Adding the nodes_parent parameter to the apply function
+        py_ast.body[0].args.args.append(ast.Name(id="nodes_parent"))
+
         specializer = RecursiveSpecializer(py_ast, self.self_object, grid_type)
         specializer.typedef += PriorityQueueInterface.definitions
         specializer.func_defs += get_func_declarations().values()
@@ -209,16 +300,17 @@ class AStarSpecializer(LazySpecializedFunction):
             #include <stdlib.h>
             #include <math.h>
         """)]
+        # TODO change NUM_DIMENSIONS and GRID_DIMENSIONS accordingly
         specializer.defines = [StringTemplate("""
             #define False 0
             #define True 1
             #define inf INFINITY
 
-            #define NUM_DIMENSIONS 3
-            #define GRID_DIMENSIONS {3,4,5}
+            #define NUM_DIMENSIONS 2
+            #define GRID_DIMENSIONS {100,100}
         """)]
         specializer.local_include = [StringTemplate("""\
-            #include "/Users/hugo/Dropbox/Estudos/Berkeley/SEJITS/A*/scratch_dev/priority_queue_interface.h"
+            #include "/Users/hugo/Dropbox/Estudos/Berkeley/SEJITS/Astar/scratch_dev/priority_queue_interface.h"
         """)]
         specializer.visit()
 
@@ -318,17 +410,17 @@ class AStarSpecializer(LazySpecializedFunction):
 
         specializer.func_defs.append(priority_queue_functions)
 
-        return_type = ctypes.c_int() # FIXME ctypes.POINTER(ctypes.c_int)()
-        param_types = [grid_type(), ctypes.c_int(), ctypes.c_int()]
-        c_file = specializer.get_c_file(return_type, param_types)
+        param_types = [grid_type(), ctypes.c_int(), ctypes.c_int(),
+                       grid_type()]
+        c_file = specializer.get_c_file(param_types)
 
         return c_file
 
     def finalize(self, transform_result, program_config):
         project = Project(transform_result)
         grid_type = program_config.args_subconfig['grid_type']
-        entry_type = ctypes.CFUNCTYPE(ctypes.c_int,
-                                      grid_type, ctypes.c_int,ctypes.c_int)
+        entry_type = ctypes.CFUNCTYPE(grid_type, grid_type, ctypes.c_int,
+                                      ctypes.c_int, grid_type)
         return ConcreteSpecializedAStar("apply", project, entry_type)
 
 
@@ -337,8 +429,8 @@ class ConcreteSpecializedAStar(ConcreteSpecializedFunction):
         self._c_function = self._compile(entry_name, project_node,
                                          entry_typesig)
 
-    def __call__(self, grid, start, target, self_object):
-        return self._c_function(grid, start, target)
+    def __call__(self, grid, start, target, nodes_parent, self_object):
+        return self._c_function(grid, start, target, nodes_parent)
 
 
 def combine_coordinates(coordinates, grid_dimensions):
@@ -358,27 +450,21 @@ def decompose_coordinates(combined_coordinates, grid_dimensions, offset=0):
     for dimension_size in reversed(grid_dimensions):
         new_dimension_multiplier = dimension_multiplier * dimension_size
         multiplied_term = combined_coordinates % new_dimension_multiplier
-        decomposed_coordinates.append(multiplied_term / dimension_multiplier + offset)
+        decomposed_coordinates.append(multiplied_term / dimension_multiplier +
+                                      offset)
         dimension_multiplier = new_dimension_multiplier
         combined_coordinates -= multiplied_term
 
     return decomposed_coordinates[::-1]
 
 
-def get_specialized_a_star_grid(grid_class):
-    assert (issubclass(grid_class, GridAsArray))
+class SpecializedGrid(GridAsArray):
+    def __init__(self, grid):
+        super(SpecializedGrid, self).__init__(grid)
+        self._c_a_star = AStarSpecializer.from_function(self.a_star, "a_star")
 
-    c_a_star = AStarSpecializer.from_function(grid_class.a_star, "a_star")
-    setattr(grid_class, 'c_a_star', c_a_star)
-
-    # This is being made so that new types of grids will create new
-    # specializations. Passing the grid as a parameter to the function allows
-    # ctree to notice the difference and JIT a new function.
-    def a_star(self, start, target):
-        start = combine_coordinates(start, self.grid_shape)
-        target = combine_coordinates(target, self.grid_shape)
-        return c_a_star(self._grid, start, target, self)
-
-    grid_class.a_star = a_star
-
-    return grid_class
+    def specialized_a_star(self, start_id, target_id):
+        start = combine_coordinates(start_id, self.grid_shape)
+        target = combine_coordinates(target_id, self.grid_shape)
+        nodes_parent = np.ones(self.grid_shape) * -1
+        return self._c_a_star(self._grid, start, target, nodes_parent, self)
