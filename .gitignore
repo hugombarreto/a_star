@@ -6,3 +6,6 @@
 
 # pycharm
 .idea
+
+# kernprof files
+*.lprof
