@@ -1,4 +1,4 @@
-AStarSpecializer -- A specializer built on the ASP SEJITS framework
+a_star -- A specializer built on the ASP SEJITS framework
 -------
 
 AStarSpecializer is based on ctree
