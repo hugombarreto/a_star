@@ -2,7 +2,7 @@ import pickle
 import unittest
 import numpy as np
 from os import listdir
-from AStarSpecializer.astar import GridAsArray
+from a_star.astar import GridAsArray
 
 
 def get_random_grid(dimension, grid_type, barrier_probability=0.3):

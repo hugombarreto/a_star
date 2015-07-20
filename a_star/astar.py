@@ -1,7 +1,7 @@
 from collections import defaultdict
 import heapq
 import numpy as np
-from AStarSpecializer.np_functional import np_map, np_reduce, np_elementwise
+from a_star.np_functional import np_map, np_reduce, np_elementwise
 
 
 class PriorityQueue(object):

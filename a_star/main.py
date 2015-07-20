@@ -1,7 +1,7 @@
 """
 specializer AStarSpecializer
 """
-from AStarSpecializer.specializers import AStarSpecializer
+from a_star.specializers import AStarSpecializer
 
 
 def mul_3(i):

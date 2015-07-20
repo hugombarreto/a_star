@@ -1,6 +1,6 @@
 import unittest
 from tests.test_a_star import TestAStar, get_random_grid
-from AStarSpecializer.specializers import SpecializedGrid
+from a_star.specializers import SpecializedGrid
 
 
 class TestSpecializedAStar(TestAStar):

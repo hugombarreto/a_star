@@ -7,14 +7,14 @@ from ctree.templates.nodes import StringTemplate
 from ctree.transformations import PyBasicConversions
 from ctree.transformations import CFile
 from ctree.visitors import NodeTransformer
-from AStarSpecializer.astar import GridAsArray
+from a_star.astar import GridAsArray
 
 import logging
-from AStarSpecializer.generic_transformers import LambdaLifter,\
+from a_star.generic_transformers import LambdaLifter,\
     MethodCallsTransformer, ReturnTypeFinder
-from AStarSpecializer.np_functional import TransformFunctionalNP
-from AStarSpecializer.priority_queue_interface import transform_priority_queue
-from AStarSpecializer.priority_queue_interface import transform_node_info, \
+from a_star.np_functional import TransformFunctionalNP
+from a_star.priority_queue_interface import transform_priority_queue
+from a_star.priority_queue_interface import transform_node_info, \
     PriorityQueueInterface
 
 #logging.basicConfig(level=logging.DEBUG)

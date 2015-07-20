@@ -1,7 +1,7 @@
 import numpy as np
 from ctree.c.nodes import *
 from ctree.templates.nodes import StringTemplate
-from AStarSpecializer.generic_transformers import ClassToStructureTransformer
+from a_star.generic_transformers import ClassToStructureTransformer
 
 transform_priority_queue = ClassToStructureTransformer(
     "PriorityQueue",
