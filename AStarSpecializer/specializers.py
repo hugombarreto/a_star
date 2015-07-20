@@ -7,7 +7,7 @@ from ctree.templates.nodes import StringTemplate
 from ctree.transformations import PyBasicConversions
 from ctree.transformations import CFile
 from ctree.visitors import NodeTransformer
-from AStarSpecializer.a_star import GridAsArray
+from AStarSpecializer.astar import GridAsArray
 
 import logging
 from AStarSpecializer.generic_transformers import LambdaLifter,\
