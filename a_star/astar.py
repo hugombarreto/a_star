@@ -178,7 +178,7 @@ class GridAsArray(BaseGrid):
             A* algorithm, the barriers are represented by `numpy.inf`
         """
         super(GridAsArray, self).__init__(grid)
-        self._grid = grid
+        self.grid = grid
 
     def insert_edge(self, a, b, weight):
         raise NotImplementedError
@@ -187,4 +187,4 @@ class GridAsArray(BaseGrid):
         return dict(self._get_neighbor_weight_list(node_id))
 
     def _get_neighbor_weight_list(self, node_id):
-        return self._get_neighbors(self._grid, node_id)
+        return self._get_neighbors(self.grid, node_id)
