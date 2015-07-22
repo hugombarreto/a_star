@@ -1,6 +1,6 @@
 import unittest
 from tests.test_a_star import TestAStar, get_random_grid
-from a_star.specializers import SpecializedGrid
+from a_star.specializers import SpecializedGrid, decompose_coordinates
 
 
 class TestSpecializedAStar(TestAStar):
@@ -8,39 +8,46 @@ class TestSpecializedAStar(TestAStar):
         super(TestSpecializedAStar, self).__init__(*args, **kwargs)
         self.grid_type = SpecializedGrid
 
+    # @profile
     def test_compare_specialization(self):
         grid, start, finish = get_random_grid(self.grid_size, self.grid_type)
+        c_cost = self._get_a_star_cost(grid, start, finish)
         py_cost = super(TestSpecializedAStar, self)._get_a_star_cost(
             grid, start, finish)
-        c_cost = self._get_a_star_cost(grid, start, finish)
 
         self.assertEqual(py_cost, c_cost)
 
-    def _get_a_star_cost(self, grid, start, finish):
-        # print graph._grid
-        path_trace = grid.specialized_a_star(start, finish)
-        path_trace = grid.a_star(start, finish)
-        # print "start: ", start
-        # print "finish: ", finish
-        # print path_trace
-        # if tuple(finish) not in path_trace:
-        #     return None
-        #
-        # cost = 0
-        # current_node = finish
-        #
-        # while tuple(current_node) != tuple(start):
-        #     current_parent = path_trace[tuple(current_node)].parent
-        #     cost += graph.get_neighbor_edges(current_parent)[tuple(current_node)]
-        #     current_node = current_parent
-        #
-        # return cost
+    def test_many_comparisons(self):
+        for _ in xrange(100):
+            self.test_compare_specialization()
 
-        return 0
+    def test_many_random_grids(self):
+        for _ in xrange(1000):
+            self.test_random_grid()
+
+    def _get_a_star_cost(self, grid, start, finish):
+        path_trace = grid.specialized_a_star(start, finish)
+
+        if start == finish:
+            return 0
+
+        if path_trace[finish] < 0:
+            return None
+
+        node = finish
+        cost = 0
+        while node != start:
+            node = decompose_coordinates(path_trace[node], grid.grid_shape)
+            cost += grid.grid[node]
+        return cost
 
 
 if __name__ == '__main__':
-    print "start"
-    suite = unittest.TestLoader().loadTestsFromTestCase(TestSpecializedAStar)
+    # suite = unittest.TestLoader().loadTestsFromTestCase(TestSpecializedAStar)
+
+    suite = unittest.TestSuite()
+    suite.addTest(TestSpecializedAStar('test_many_random_grids'))
+
     unittest.TextTestRunner(verbosity=0).run(suite)
-    print "finish"
+
+
