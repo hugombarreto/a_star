@@ -212,8 +212,8 @@ class ReturnTypeFinder(TypeTrackingTransformer):
             attr_name = node.value.name
         elif isinstance(node.value, ast.Attribute):
             attr_name = CompleteAttrName().get_complete_name(node)
-        elif isinstance(node.value, Constant):
-            self.return_type = node.value.value
+        elif isinstance(node.value, ast.Num):
+            self.return_type = get_ctype(node.value.n)
         else:
             self.return_type = node.value
 
