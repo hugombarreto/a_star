@@ -3,7 +3,7 @@ import numpy as np
 from ctree.c.nodes import *
 from ctree.jit import LazySpecializedFunction, ConcreteSpecializedFunction
 from ctree.nodes import Project
-from ctree.templates.nodes import StringTemplate
+from ctree.templates.nodes import StringTemplate, FileTemplate
 from ctree.transformations import PyBasicConversions
 from ctree.transformations import CFile
 from ctree.visitors import NodeTransformer
@@ -17,7 +17,7 @@ from a_star.priority_queue_interface import transform_priority_queue
 from a_star.priority_queue_interface import transform_node_info, \
     PriorityQueueInterface
 
-#logging.basicConfig(level=logging.DEBUG)
+# logging.basicConfig(level=logging.DEBUG)
 
 
 class DictToArrayTransformer(NodeTransformer):
@@ -44,7 +44,7 @@ class DictToArrayTransformer(NodeTransformer):
                 StringTemplate("""\
                     const int number_items = $num_items;
                     const struct NodeInfo node_info_initializer = $struct_body;
-                    struct NodeInfo nodes_info_temp[number_items];
+                    struct NodeInfo* nodes_info_temp = malloc(number_items * sizeof(struct NodeInfo));
                     for(int i = 0; i < number_items; ++i) {
                         nodes_info_temp[i] = node_info_initializer;
                     }""", template_entries),
@@ -54,18 +54,14 @@ class DictToArrayTransformer(NodeTransformer):
         return node
 
 
-class PySpecificAStarConversions(NodeTransformer):
-    def __init__(self, grid_type):
-        self._grid_type = grid_type
-        self.lift = []
+class AStarForConversions(NodeTransformer):
+    def __init__(self, rec_specializer):
+        self._grid_type = rec_specializer.grid_type
+        self.self_object = rec_specializer.self_object
 
     def visit_For(self, node):
         self.generic_visit(node)
-        # FIXME this assumes max num of neighbors is 2 * (num of dimensions)
-        num_neighbors = 2 * self._grid_type._ndim_
-        # call_neighbors = Assign(SymbolRef("neighbors",
-        #                                   ctypes.POINTER(ctypes.c_int)()),
-        #                         node.iter)
+        num_neighbors = self._get_number_neighbors()
         call_neighbors = [ArrayDef(SymbolRef("neighbors", ctypes.c_int()),
                                    num_neighbors,
                                    Array(ctypes.c_int(),
@@ -94,6 +90,10 @@ class PySpecificAStarConversions(NodeTransformer):
         )
         node = MultiNode(body=[call_neighbors, for_loop])
         return node
+
+    def _get_number_neighbors(self):
+        neighborhood_matrix = self.self_object.neighborhood_matrix
+        return neighborhood_matrix.shape[0]
 
 
 class NeighborWeightListConverter(object):
@@ -187,13 +187,14 @@ class NodesInfoTransformer(NodeTransformer):
                     nodes_parent[i] = nodes_info[i].parent;
                 }
             }
+            free(nodes_info);
         """), Assign(SymbolRef("nodes_parent_temp", self.grid_type()),
                      SymbolRef("nodes_parent")),
               Return(SymbolRef("nodes_parent_temp"))])
 
 
 def get_func_declarations():
-    return PriorityQueueInterface.functions
+    return PriorityQueueInterface(100000, ).functions
 
 
 # TODO find out why g is not getting the type properly
@@ -244,15 +245,10 @@ class RecursiveSpecializer(object):
         DictToArrayTransformer(self.grid_type, self.typedef).visit(body)
 
         NeighborWeightListConverter(self).visit(body)
-
         MethodCallsTransformer(self).visit(body)
-
-        py_specific = PySpecificAStarConversions(self.grid_type)
-        body = py_specific.visit(body)
-
+        AStarForConversions(self).visit(body)
         NodesInfoTransformer(self).visit(body)
-
-        body = fixGType().visit(body)
+        fixGType().visit(body)
 
         return_type_finder = ReturnTypeFinder(self)
         return_type_finder.visit(body)
@@ -288,130 +284,41 @@ class AStarSpecializer(LazySpecializedFunction):
 
     def transform(self, py_ast, program_config):
         grid_type = program_config.args_subconfig['grid_type']
+        grid_shape = grid_type._shape_
 
         # Adding the nodes_parent parameter to the apply function
         py_ast.body[0].args.args.append(ast.Name(id="nodes_parent"))
 
         specializer = RecursiveSpecializer(py_ast, self.self_object, grid_type)
-        specializer.typedef += PriorityQueueInterface.definitions
-        specializer.func_defs += get_func_declarations().values()
-        specializer.func_def_names += get_func_declarations().keys()
+        # FIXME properly determine the heap size
+        priority_queue_interface = PriorityQueueInterface(100000, grid_shape)
+        specializer.typedef += priority_queue_interface.definitions
+        specializer.func_defs += priority_queue_interface.functions.values()
+        specializer.func_def_names += priority_queue_interface.functions.keys()
         specializer.includes = [StringTemplate("""\
             #include <stdlib.h>
             #include <math.h>
+
+            #include <stdio.h>
         """)]
-        # TODO change NUM_DIMENSIONS and GRID_DIMENSIONS accordingly
         specializer.defines = [StringTemplate("""
             #define False 0
             #define True 1
             #define inf INFINITY
+        """)]
+        templates_path = os.path.join(os.path.dirname(__file__),
+                                      os.pardir, "templates")
+        pq_int = os.path.join(templates_path, "priority_queue_interface.h")
+        pq_func_path = os.path.join(templates_path, "priority_queue.tmpl.c")
 
-            #define NUM_DIMENSIONS 2
-            #define GRID_DIMENSIONS {100,100}
-        """)]
-        specializer.local_include = [StringTemplate("""\
-            #include "/Users/hugo/Dropbox/Estudos/Berkeley/SEJITS/Astar/scratch_dev/priority_queue_interface.h"
-        """)]
+        specializer.local_include = [StringTemplate('#include "%s"' % pq_int)]
         specializer.visit()
 
-        #TODO use the following string as a C template
-        priority_queue_functions = StringTemplate("""
-
-        unsigned get_parent(unsigned const element_index);
-        unsigned get_first_child(unsigned const element_index);
-
-        inline unsigned get_parent(unsigned const element_index)
-        {
-            return (element_index - 1)/2;
-        }
-
-        inline unsigned get_first_child(unsigned const element_index)
-        {
-            return 2 * element_index + 1;
-        }
-
-        struct PriorityQueue* new_heap(unsigned const heap_size)
-        {
-            struct PriorityQueue* heap;
-            if ((heap = malloc(sizeof(*heap))) == NULL) {
-                return NULL;
-            }
-            if ((heap->array = malloc(heap_size * sizeof(*(heap->array)))) == NULL) {
-                free(heap);
-                return NULL;
-            }
-            heap->size = 0;
-            heap->max_size = heap_size;
-            return heap;
-        }
-
-        int heap_insert(struct PriorityQueue* const heap, const struct heap_element element)
-        {
-            if (heap->size >= heap->max_size) {
-                return 1;
-            }
-            unsigned element_index = heap->size;
-            for (unsigned parent_index; element_index > 0; element_index = parent_index) {
-                parent_index = get_parent(element_index);
-                struct heap_element parent = heap->array[parent_index];
-                if (element.priority >= parent.priority) {
-                    break;
-                }
-                heap->array[element_index] = parent;
-            }
-            heap->array[element_index] = element;
-            heap->size++;
-            return 0;
-        }
-
-        struct heap_element* find_heap_min(const struct PriorityQueue* heap)
-        {
-            if (heap->size == 0) {
-                return NULL;
-            }
-            return &(heap->array[0]);
-        }
-
-        int delete_heap_min(struct PriorityQueue* const heap)
-        {
-            if (heap->size == 0) {
-                return 1;
-            }
-            struct heap_element element = heap->array[--(heap->size)];
-            unsigned element_index = 0;
-            for (unsigned first_child = get_first_child(element_index); first_child < heap->size; first_child = get_first_child(element_index)){
-                unsigned lowest_child;
-                unsigned second_child = first_child + 1;
-                if ((second_child < heap->size) && (heap->array[first_child].priority > heap->array[second_child].priority)){
-                    lowest_child = second_child;
-                } else {
-                    lowest_child = first_child;
-                }
-                if (element.priority <= heap->array[lowest_child].priority) {
-                    break;
-                }
-                heap->array[element_index] = heap->array[lowest_child];
-                element_index = lowest_child;
-            }
-            heap->array[element_index] = element;
-
-            return 0;
-        }
-
-        void free_heap(struct PriorityQueue* const heap)
-        {
-            if (heap == NULL) {
-                return;
-            }
-            free(heap->array);
-            free(heap);
-        }
-        """)
+        priority_queue_functions = FileTemplate(pq_func_path)
 
         specializer.func_defs.append(priority_queue_functions)
 
-        param_types = [grid_type(), ctypes.c_int(), ctypes.c_int(),
-                       grid_type()]
+        param_types = [grid_type(), ctypes.c_int(), ctypes.c_int(), grid_type()]
         c_file = specializer.get_c_file(param_types)
 
         return c_file
@@ -426,6 +333,7 @@ class AStarSpecializer(LazySpecializedFunction):
 
 class ConcreteSpecializedAStar(ConcreteSpecializedFunction):
     def __init__(self, entry_name, project_node, entry_typesig):
+        #ctree.CONFIG.set("c", "CFLAGS", "-g -fPIC -std=c99")
         self._c_function = self._compile(entry_name, project_node,
                                          entry_typesig)
 
@@ -455,7 +363,7 @@ def decompose_coordinates(combined_coordinates, grid_dimensions, offset=0):
         dimension_multiplier = new_dimension_multiplier
         combined_coordinates -= multiplied_term
 
-    return decomposed_coordinates[::-1]
+    return tuple(decomposed_coordinates[::-1])
 
 
 class SpecializedGrid(GridAsArray):
@@ -463,8 +371,13 @@ class SpecializedGrid(GridAsArray):
         super(SpecializedGrid, self).__init__(grid)
         self._c_a_star = AStarSpecializer.from_function(self.a_star, "a_star")
 
+    # @staticmethod
+    # def _calculate_heuristic_cost(current_node_id, target_node_id):
+    #     return 0
+
+    # @profile
     def specialized_a_star(self, start_id, target_id):
         start = combine_coordinates(start_id, self.grid_shape)
         target = combine_coordinates(target_id, self.grid_shape)
-        nodes_parent = np.ones(self.grid_shape) * -1
-        return self._c_a_star(self._grid, start, target, nodes_parent, self)
+        nodes_parent = np.full(self.grid_shape, -1)
+        return self._c_a_star(self.grid, start, target, nodes_parent, self)
