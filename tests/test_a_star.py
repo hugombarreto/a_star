@@ -12,12 +12,16 @@ def get_random_grid(dimension, grid_type, barrier_probability=0.3):
         if i < barrier_probability else np.rint(i*1000)+1)
     grid_array = generate_barriers(np.random.rand(*dimension))
 
-    start = tuple(np.random.random_integers(0, i - 1) for i in dimension)
-    finish = tuple(np.random.random_integers(0, i - 1) for i in dimension)
+    margin_grid = np.pad(grid_array, 1, 'constant', constant_values=-1)
+    margin_grid[margin_grid < 0] = np.inf
 
-    grid_array[start] = 1
-    grid_array[finish] = 1
-    return grid_type(grid_array), start, finish
+    start = tuple(np.random.random_integers(1, i) for i in dimension)
+    finish = tuple(np.random.random_integers(1, i) for i in dimension)
+
+    margin_grid[start] = 1
+    margin_grid[finish] = 1
+
+    return grid_type(margin_grid), start, finish
 
 
 def load_grid(filename):
@@ -32,8 +36,8 @@ def save_grid(grid, file_prefix, directory, start_node=None, end_node=None):
     while file_name in files_in_directory:
         file_name = file_prefix + str(file_counter) + ".p"
         file_counter += 1
-    pickle.dump((grid, start_node, end_node),
-                open(directory + file_name, "wb"))
+    complete = [grid, start_node, end_node]
+    pickle.dump(complete, open(directory + file_name, "wb"))
     print 'saved: "' + directory + file_name + '"'
 
 
@@ -41,13 +45,13 @@ class TestAStar(unittest.TestCase):
     def __init__(self, *args, **kwargs):
         super(TestAStar, self).__init__(*args, **kwargs)
         self.grid_type = GridAsArray
-        self.grid_size = (100, 100)
+        self.grid_size = (10, 10)
 
     def test_random_grid(self):
         self._test_grid(*get_random_grid(self.grid_size, self.grid_type))
 
     def test_many_random_grids(self):
-        for i in xrange(100):
+        for _ in xrange(100):
             self.test_random_grid()
 
     def test_grid_from_file(self):
@@ -61,8 +65,8 @@ class TestAStar(unittest.TestCase):
         start_finish_cost = self._get_a_star_cost(grid, start, finish)
         finish_start_cost = self._get_a_star_cost(grid, finish, start)
 
-        if start_finish_cost != finish_start_cost:
-            save_grid(grid, "random_grid", "boards/", start, finish)
+        # if start_finish_cost != finish_start_cost:
+        #     save_grid(grid, "random_grid", "boards/", start, finish)
 
         self.assertEqual(start_finish_cost, finish_start_cost, msg)
 
