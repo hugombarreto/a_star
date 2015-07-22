@@ -37,7 +37,6 @@ class TransformFunctionalNP(NodeTransformer):
             return node
 
         func_name = node.func.id
-        print "Node: ", node, ", name: ", func_name
         if func_name not in np_functional_functions:
             return node
 
