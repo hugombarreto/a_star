@@ -94,7 +94,6 @@ class TransformFunctionalNP(NodeTransformer):
             params.append(SymbolRef("B", self.array_type()))
             return_type = self.array_type()
             defn = [
-
                 For(Assign(SymbolRef("i", c_int()), Constant(0)),
                     Lt(SymbolRef("i"), Constant(number_items)),
                     PreInc(SymbolRef("i")),
