@@ -193,10 +193,6 @@ class NodesInfoTransformer(NodeTransformer):
               Return(SymbolRef("nodes_parent_temp"))])
 
 
-def get_func_declarations():
-    return PriorityQueueInterface(100000, ).functions
-
-
 # TODO find out why g is not getting the type properly
 class fixGType(NodeTransformer):
     def visit_Assign(self, node):
@@ -290,8 +286,7 @@ class AStarSpecializer(LazySpecializedFunction):
         py_ast.body[0].args.args.append(ast.Name(id="nodes_parent"))
 
         specializer = RecursiveSpecializer(py_ast, self.self_object, grid_type)
-        # FIXME properly determine the heap size
-        priority_queue_interface = PriorityQueueInterface(100000, grid_shape)
+        priority_queue_interface = PriorityQueueInterface(grid_shape)
         specializer.typedef += priority_queue_interface.definitions
         specializer.func_defs += priority_queue_interface.functions.values()
         specializer.func_def_names += priority_queue_interface.functions.keys()
@@ -306,8 +301,8 @@ class AStarSpecializer(LazySpecializedFunction):
             #define True 1
             #define inf INFINITY
         """)]
-        templates_path = os.path.join(os.path.dirname(__file__),
-                                      os.pardir, "templates")
+        templates_path = os.path.join(os.path.dirname(
+            os.path.abspath(__file__)), os.pardir, "templates")
         pq_int = os.path.join(templates_path, "priority_queue_interface.h")
         pq_func_path = os.path.join(templates_path, "priority_queue.tmpl.c")
 
