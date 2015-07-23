@@ -1,3 +1,4 @@
+import os
 import pickle
 import unittest
 import numpy as np
@@ -24,8 +25,10 @@ def get_random_grid(dimension, grid_type, barrier_probability=0.3):
     return grid_type(margin_grid), start, finish
 
 
-def load_grid(filename):
+def load_grid(filename, grid_class=None):
     grid, start, finish = pickle.load(open(filename, "rb"))
+    if grid_class is not None:
+        grid = grid_class(grid)
     return grid, start, finish
 
 
@@ -36,8 +39,8 @@ def save_grid(grid, file_prefix, directory, start_node=None, end_node=None):
     while file_name in files_in_directory:
         file_name = file_prefix + str(file_counter) + ".p"
         file_counter += 1
-    complete = [grid, start_node, end_node]
-    pickle.dump(complete, open(directory + file_name, "wb"))
+    complete = (grid.grid, start_node, end_node)
+    pickle.dump(complete, open(os.path.join(directory, file_name), "wb"))
     print 'saved: "' + directory + file_name + '"'
 
 
@@ -48,7 +51,8 @@ class TestAStar(unittest.TestCase):
         self.grid_size = (10, 10)
 
     def test_random_grid(self):
-        self._test_grid(*get_random_grid(self.grid_size, self.grid_type))
+        grid, start, finish = get_random_grid(self.grid_size, self.grid_type)
+        self._test_grid(grid, start, finish)
 
     def test_many_random_grids(self):
         for _ in xrange(100):
@@ -56,17 +60,22 @@ class TestAStar(unittest.TestCase):
 
     def test_grid_from_file(self):
         import glob
-        files = glob.glob("grids/*.p")
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                            "grids/*.p")
+        files = glob.glob(path)
         for file_name in files:
-            grid, start, finish = load_grid(file_name)
-            self._test_grid(grid, start, finish, "grid from file:" + file_name)
+            grid, start, finish = load_grid(file_name, self.grid_type)
+            self._test_grid(grid, start, finish,
+                            "grid from file:" + file_name, False)
 
-    def _test_grid(self, grid, start, finish, msg=None):
+    def _test_grid(self, grid, start, finish, msg=None, save=True):
         start_finish_cost = self._get_a_star_cost(grid, start, finish)
         finish_start_cost = self._get_a_star_cost(grid, finish, start)
 
-        # if start_finish_cost != finish_start_cost:
-        #     save_grid(grid, "random_grid", "boards/", start, finish)
+        if save and (start_finish_cost != finish_start_cost):
+            path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                "grids")
+            save_grid(grid, "random_grid", path, start, finish)
 
         self.assertEqual(start_finish_cost, finish_start_cost, msg)
 
@@ -78,9 +87,11 @@ class TestAStar(unittest.TestCase):
         cost = 0
         node = finish
 
+        #print "|start: ", start, " finish: ", finish
         while tuple(node) != tuple(start):
             current_parent = path_trace[tuple(node)].parent
             cost += grid.get_neighbor_edges(current_parent)[tuple(node)]
+            #print node, grid.get_neighbor_edges(current_parent)[tuple(node)]
             node = current_parent
 
         return cost
