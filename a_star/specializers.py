@@ -17,7 +17,7 @@ from a_star.priority_queue_interface import transform_priority_queue
 from a_star.priority_queue_interface import transform_node_info, \
     PriorityQueueInterface
 
-# logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.DEBUG)
 
 
 class DictToArrayTransformer(NodeTransformer):
@@ -229,7 +229,9 @@ class RecursiveSpecializer(object):
         body = transform_node_info.visit(body)
         body = transform_priority_queue.visit(body)
         for tdef in transform_node_info.lift + transform_priority_queue.lift:
-            if tdef not in self.typedef:
+            existing_tdef = next((t for t in self.typedef if t.struct_type ==
+                                  tdef.struct_type), None)
+            if existing_tdef is None:
                 self.typedef.append(tdef)
 
         LambdaLifter(self).visit(body)
@@ -266,8 +268,7 @@ class RecursiveSpecializer(object):
             self.body.return_type = return_type
 
         complete_list = self.includes + self.defines + self.typedef + \
-                        self.local_include + self.func_defs + \
-                        [self.body]
+                        self.local_include + self.func_defs + [self.body]
         return CFile("generated", complete_list)
 
 
@@ -313,7 +314,7 @@ class AStarSpecializer(LazySpecializedFunction):
 
         specializer.func_defs.append(priority_queue_functions)
 
-        param_types = [grid_type(), ctypes.c_int(), ctypes.c_int(), grid_type()]
+        param_types = [grid_type(), ctypes.c_int(), ctypes.c_int(),grid_type()]
         c_file = specializer.get_c_file(param_types)
 
         return c_file
@@ -328,7 +329,6 @@ class AStarSpecializer(LazySpecializedFunction):
 
 class ConcreteSpecializedAStar(ConcreteSpecializedFunction):
     def __init__(self, entry_name, project_node, entry_typesig):
-        #ctree.CONFIG.set("c", "CFLAGS", "-g -fPIC -std=c99")
         self._c_function = self._compile(entry_name, project_node,
                                          entry_typesig)
 
