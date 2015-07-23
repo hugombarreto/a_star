@@ -48,7 +48,7 @@ class TestAStar(unittest.TestCase):
     def __init__(self, *args, **kwargs):
         super(TestAStar, self).__init__(*args, **kwargs)
         self.grid_type = GridAsArray
-        self.grid_size = (10, 10)
+        self.grid_size = (10, 5, 9)
 
     def test_random_grid(self):
         grid, start, finish = get_random_grid(self.grid_size, self.grid_type)
@@ -86,12 +86,9 @@ class TestAStar(unittest.TestCase):
 
         cost = 0
         node = finish
-
-        #print "|start: ", start, " finish: ", finish
         while tuple(node) != tuple(start):
             current_parent = path_trace[tuple(node)].parent
             cost += grid.get_neighbor_edges(current_parent)[tuple(node)]
-            #print node, grid.get_neighbor_edges(current_parent)[tuple(node)]
             node = current_parent
 
         return cost
