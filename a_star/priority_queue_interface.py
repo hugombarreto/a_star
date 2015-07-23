@@ -28,8 +28,8 @@ transform_node_info = ClassToStructureTransformer(
 
 
 class PriorityQueueInterface(object):
-    def __init__(self, heap_size, grid_dimensions):
-        self.heap_size = heap_size
+    def __init__(self, grid_dimensions):
+        self.heap_size = reduce(lambda x,y: x*y, grid_dimensions)/2
         self.grid_dimensions = grid_dimensions
         self.num_dimensions = len(grid_dimensions)
 
@@ -51,7 +51,7 @@ class PriorityQueueInterface(object):
                 name="PriorityQueue_push",
                 params=[SymbolRef("queue", Struct("PriorityQueue", ptr=True)),
                         SymbolRef("element", Struct("heap_element"))],
-                defn=[StringTemplate("""heap_insert(queue, element);printf("%i\\n", queue->size);""")]
+                defn=[StringTemplate("""heap_insert(queue, element);""")]
             ),
             "PriorityQueue_pop": FunctionDecl(
                 return_type=Struct("heap_element"),
@@ -86,8 +86,7 @@ class PriorityQueueInterface(object):
                     if ((multiple_coordinate = malloc($NUM_DIMENSIONS * sizeof(*multiple_coordinate))) == NULL) {
                         return NULL;
                     }
-
-                    for (int i = 0; i < $NUM_DIMENSIONS; ++i) {
+                    for (int i = $NUM_DIMENSIONS - 1; i >= 0; --i) {
                         int new_dimension_multiplier = dimension_multiplier * grid_dimensions[i];
                         int multiplied_term = coordinate % new_dimension_multiplier;
                         multiple_coordinate[i] = multiplied_term / dimension_multiplier;
