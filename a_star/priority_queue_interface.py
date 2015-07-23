@@ -29,7 +29,7 @@ transform_node_info = ClassToStructureTransformer(
 
 class PriorityQueueInterface(object):
     def __init__(self, grid_dimensions):
-        self.heap_size = reduce(lambda x,y: x*y, grid_dimensions)/2
+        self.heap_size = reduce(lambda x, y: x*y, grid_dimensions)/2
         self.grid_dimensions = grid_dimensions
         self.num_dimensions = len(grid_dimensions)
 
