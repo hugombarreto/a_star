@@ -21,10 +21,6 @@ class TestSpecializedAStar(TestAStar):
         for _ in xrange(100):
             self.test_compare_specialization()
 
-    def test_many_random_grids(self):
-        for _ in xrange(1000):
-            self.test_random_grid()
-
     def _get_a_star_cost(self, grid, start, finish):
         path_trace = grid.specialized_a_star(start, finish)
 
@@ -37,8 +33,8 @@ class TestSpecializedAStar(TestAStar):
         node = finish
         cost = 0
         while node != start:
-            node = decompose_coordinates(path_trace[node], grid.grid_shape)
             cost += grid.grid[node]
+            node = decompose_coordinates(path_trace[node], grid.grid_shape)
         return cost
 
 
