@@ -4,6 +4,7 @@ import ast
 from ctree.c.nodes import *
 from ctree.cpp.nodes import CppDefine
 from ctree.transformations import PyBasicConversions
+from a_star.structure import StructDef
 
 
 class LambdaLifter(NodeTransformer):
@@ -35,10 +36,10 @@ class ClassToStructureTransformer(NodeTransformer):
        the struct definitions are stored in the lift list
     """
 
-    def __init__(self, class_name, defn, initial_values=None,
+    def __init__(self, c_structure, initial_values=None,
                  self_defined=False, constructor=None, pointer=False):
-        self.class_name = class_name
-        self.defn = defn
+        self.class_name = c_structure.__name__
+        self.c_structure = c_structure
         self.self_defined = self_defined
         self.initial_values = initial_values
         self.constructor = constructor
@@ -57,8 +58,7 @@ class ClassToStructureTransformer(NodeTransformer):
             if self.self_defined and is_self_attribute or \
                             not self.self_defined and has_id:
                 struct_init = None
-                struct = Struct(self.class_name, ptr=self.pointer)
-                node = SymbolRef(node.targets[0].id, struct)
+                node = SymbolRef(node.targets[0].id, self.c_structure())
                 if self.constructor is not None:
                     node = Assign(node, self.constructor)
                 elif self.initial_values is not None:
@@ -66,8 +66,7 @@ class ClassToStructureTransformer(NodeTransformer):
                     struct_init = ast.parse(ast.List(elts=values_ast))
                     struct_init = PyBasicConversions().visit(struct_init)
                     node = Assign(node, struct_init)
-                self.lift.append(StructDef(self.class_name, self.defn,
-                                           initializer=struct_init))
+                self.lift.append(StructDef(self.c_structure, struct_init))
                 return node
 
         self.generic_visit(node)
