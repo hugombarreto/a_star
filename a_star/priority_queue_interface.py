@@ -1,30 +1,43 @@
+from ctypes import POINTER
 import numpy as np
 from ctree.c.nodes import *
 from ctree.templates.nodes import StringTemplate
 from a_star.generic_transformers import ClassToStructureTransformer
 
+
+# TODO may change heap_element to HeapElement
+from a_star.structure import StructDef, CodegenableStruct
+
+
+class heap_element(CodegenableStruct):
+    _fields_ = [("id", ctypes.c_int), ("priority", ctypes.c_long)]
+
+
+class PriorityQueue(CodegenableStruct):
+    _fields_ = [
+        ("array", POINTER(heap_element)),
+        ("size", ctypes.c_uint),
+        ("max_size", ctypes.c_uint)
+    ]
+
+
+class NodeInfo(CodegenableStruct):
+    _fields_ = [
+        ('f', ctypes.c_double),
+        ('g', ctypes.c_double),
+        ('parent', ctypes.c_int),
+        ('closed', ctypes.c_int)
+    ]
+
+
 transform_priority_queue = ClassToStructureTransformer(
-    "PriorityQueue",
-    [
-        SymbolRef("array", Struct("heap_element", ptr=True)),
-        SymbolRef("size", np.uintc()),
-        SymbolRef("max_size", np.uintc()),
-    ],
+    PriorityQueue,
     constructor=FunctionCall(SymbolRef("PriorityQueue_init")),
     pointer=True
 )
 
 transform_node_info = ClassToStructureTransformer(
-    "NodeInfo",
-    [
-        SymbolRef('f', ctypes.c_double()),
-        SymbolRef('g', ctypes.c_double()),
-        SymbolRef('parent', ctypes.c_int()),
-        SymbolRef('closed', ctypes.c_int())
-    ],
-    initial_values=[0, np.inf, -1, 0],
-    self_defined=True
-)
+    NodeInfo, initial_values=[0, np.inf, -1, 0], self_defined=True)
 
 
 class PriorityQueueInterface(object):
@@ -33,14 +46,11 @@ class PriorityQueueInterface(object):
         self.grid_dimensions = grid_dimensions
         self.num_dimensions = len(grid_dimensions)
 
-        self.definitions = [StructDef("heap_element", [
-            SymbolRef("id", ctypes.c_int()),
-            SymbolRef("priority", ctypes.c_long())
-        ])]
+        self.definitions = [StructDef(heap_element)]
 
         self.functions = {
             "PriorityQueue_init": FunctionDecl(
-                return_type=Struct("PriorityQueue", ptr=True),
+                return_type=POINTER(PriorityQueue)(),
                 name="PriorityQueue_init",
                 params=None,
                 defn=[Return(FunctionCall(SymbolRef("new_heap"),
@@ -49,14 +59,14 @@ class PriorityQueueInterface(object):
             "PriorityQueue_push": FunctionDecl(
                 return_type=None,
                 name="PriorityQueue_push",
-                params=[SymbolRef("queue", Struct("PriorityQueue", ptr=True)),
-                        SymbolRef("element", Struct("heap_element"))],
+                params=[SymbolRef("queue", POINTER(PriorityQueue)()),
+                        SymbolRef("element", heap_element())],
                 defn=[StringTemplate("""heap_insert(queue, element);""")]
             ),
             "PriorityQueue_pop": FunctionDecl(
-                return_type=Struct("heap_element"),
+                return_type=heap_element(),
                 name="PriorityQueue_pop",
-                params=[SymbolRef("queue", Struct("PriorityQueue", ptr=True))],
+                params=[SymbolRef("queue", POINTER(PriorityQueue)())],
                 defn=[StringTemplate("""\
                     struct heap_element element = *find_heap_min(queue);
                     delete_heap_min(queue);
@@ -64,7 +74,7 @@ class PriorityQueueInterface(object):
                       ]
             ),
             "Node": FunctionDecl(
-                return_type=Struct("heap_element"),
+                return_type=heap_element(),
                 name="Node",
                 params=[SymbolRef("id", ctypes.c_int()),
                         SymbolRef("priority", ctypes.c_long())],
@@ -99,9 +109,9 @@ class PriorityQueueInterface(object):
                      'NUM_DIMENSIONS': Constant(self.num_dimensions)})]
             ),
             "len": FunctionDecl(
-                return_type=np.uintc(),
+                return_type=ctypes.c_uint(),
                 name="len",
-                params=[SymbolRef("queue", Struct("PriorityQueue", ptr=True))],
+                params=[SymbolRef("queue", POINTER(PriorityQueue)())],
                 defn=[StringTemplate("""return queue->size;""")]
             ),
         }

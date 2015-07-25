@@ -8,14 +8,15 @@ from ctree.transformations import PyBasicConversions
 from ctree.transformations import CFile
 from ctree.visitors import NodeTransformer
 from a_star.astar import GridAsArray
-
-import logging
 from a_star.generic_transformers import LambdaLifter,\
     MethodCallsTransformer, ReturnTypeFinder
 from a_star.np_functional import TransformFunctionalNP
-from a_star.priority_queue_interface import transform_priority_queue
-from a_star.priority_queue_interface import transform_node_info, \
-    PriorityQueueInterface
+from a_star.priority_queue_interface import transform_priority_queue, \
+    NodeInfo, transform_node_info, PriorityQueueInterface
+
+
+import logging
+from a_star.structure import StructDef
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -30,11 +31,11 @@ class DictToArrayTransformer(NodeTransformer):
         self.generic_visit(node)
         if isinstance(node.value, ast.Call) and hasattr(node.value.func, 'id')\
                 and node.value.func.id == 'defaultdict':
-            struct_name = "struct NodeInfo"
+            struct_name = "NodeInfo"
             initialization = None
             for definition in self.defines:
                 if isinstance(definition, StructDef) and \
-                                definition.struct_type == struct_name:
+                                definition.struct_name == struct_name:
                     initialization = definition.initializer
             template_entries = {
                 'num_items': Constant(self._number_items),
@@ -48,7 +49,7 @@ class DictToArrayTransformer(NodeTransformer):
                     for(int i = 0; i < number_items; ++i) {
                         nodes_info_temp[i] = node_info_initializer;
                     }""", template_entries),
-                Assign(SymbolRef("nodes_info", Struct("NodeInfo", ptr=True)),
+                Assign(SymbolRef("nodes_info", ctypes.POINTER(NodeInfo)()),
                        SymbolRef("nodes_info_temp"))
             ])
         return node
@@ -194,12 +195,20 @@ class NodesInfoTransformer(NodeTransformer):
 
 
 # TODO find out why g is not getting the type properly
-class fixGType(NodeTransformer):
+class FixGType(NodeTransformer):
     def visit_Assign(self, node):
         if hasattr(node.targets[0], 'id'):
             if node.targets[0].id == "g":
                 node.targets[0] = SymbolRef("g", ctypes.c_double())
         return node
+
+
+class FixAttribute(NodeTransformer):
+    def visit_Attribute(self, node):
+        self.generic_visit(node)
+        attr = node.attr
+        target = node.value.id
+        return BinaryOp(SymbolRef(target), Op.Dot(), SymbolRef(attr))
 
 
 class RecursiveSpecializer(object):
@@ -229,8 +238,8 @@ class RecursiveSpecializer(object):
         body = transform_node_info.visit(body)
         body = transform_priority_queue.visit(body)
         for tdef in transform_node_info.lift + transform_priority_queue.lift:
-            existing_tdef = next((t for t in self.typedef if t.struct_type ==
-                                  tdef.struct_type), None)
+            existing_tdef = next((t for t in self.typedef if t.struct_name ==
+                                  tdef.struct_name), None)
             if existing_tdef is None:
                 self.typedef.append(tdef)
 
@@ -246,7 +255,8 @@ class RecursiveSpecializer(object):
         MethodCallsTransformer(self).visit(body)
         AStarForConversions(self).visit(body)
         NodesInfoTransformer(self).visit(body)
-        fixGType().visit(body)
+        FixGType().visit(body)
+        FixAttribute().visit(body)
 
         return_type_finder = ReturnTypeFinder(self)
         return_type_finder.visit(body)
