@@ -3,12 +3,10 @@ import numpy as np
 from ctree.c.nodes import *
 from ctree.templates.nodes import StringTemplate
 from a_star.generic_transformers import ClassToStructureTransformer
-
-
-# TODO may change heap_element to HeapElement
 from a_star.structure import StructDef, CodegenableStruct
 
 
+# TODO may change heap_element to HeapElement
 class heap_element(CodegenableStruct):
     _fields_ = [("id", ctypes.c_int), ("priority", ctypes.c_long)]
 
@@ -37,7 +35,7 @@ transform_priority_queue = ClassToStructureTransformer(
 )
 
 transform_node_info = ClassToStructureTransformer(
-    NodeInfo, initial_values=[0, np.inf, -1, 0], self_defined=True)
+    NodeInfo, initial_values=[0.0, np.inf, -1, 0], self_defined=True)
 
 
 class PriorityQueueInterface(object):
