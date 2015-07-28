@@ -1,3 +1,5 @@
+from ctypes import POINTER
+import _ctypes
 from ctree import get_ast
 from ctree.visitors import NodeTransformer, NodeVisitor
 import ast
@@ -58,7 +60,11 @@ class ClassToStructureTransformer(NodeTransformer):
             if self.self_defined and is_self_attribute or \
                             not self.self_defined and has_id:
                 struct_init = None
-                node = SymbolRef(node.targets[0].id, self.c_structure())
+                if self.pointer:
+                    node = SymbolRef(node.targets[0].id,
+                                     POINTER(self.c_structure)())
+                else:
+                    node = SymbolRef(node.targets[0].id, self.c_structure())
                 if self.constructor is not None:
                     node = Assign(node, self.constructor)
                 elif self.initial_values is not None:
@@ -128,12 +134,12 @@ class TypeTrackingTransformer(NodeTransformer):
         return node
 
     def get_type_str(self, object_name):
-        type_str = str(self.variable_types[object_name])
+        object_type = self.variable_types[object_name]
+        while isinstance(object_type, _ctypes._Pointer):
+            object_type = object_type._type_()
+        type_str = str(object_type)
         if ' ' in type_str:
             type_str = type_str.split(' ')[-1]
-        if type_str[-1] == "*":
-            type_str = type_str[0:-1]
-
         return type_str
 
 
