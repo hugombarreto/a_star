@@ -9,7 +9,7 @@ from ctree.transformations import CFile
 from ctree.visitors import NodeTransformer
 from a_star.astar import GridAsArray
 from a_star.generic_transformers import LambdaLifter,\
-    MethodCallsTransformer, ReturnTypeFinder
+    MethodCallsTransformer, ReturnTypeFinder, AttributeFixer
 from a_star.np_functional import TransformFunctionalNP
 from a_star.priority_queue_interface import transform_priority_queue, \
     NodeInfo, transform_node_info, PriorityQueueInterface
@@ -203,14 +203,6 @@ class FixGType(NodeTransformer):
         return node
 
 
-class FixAttribute(NodeTransformer):
-    def visit_Attribute(self, node):
-        self.generic_visit(node)
-        attr = node.attr
-        target = node.value.id
-        return BinaryOp(SymbolRef(target), Op.Dot(), SymbolRef(attr))
-
-
 class RecursiveSpecializer(object):
     """Specializes a body and all the eventual methods called from it"""
     def __init__(self, tree, self_object, grid_type):
@@ -255,8 +247,8 @@ class RecursiveSpecializer(object):
         MethodCallsTransformer(self).visit(body)
         AStarForConversions(self).visit(body)
         NodesInfoTransformer(self).visit(body)
-        FixGType().visit(body)
-        FixAttribute().visit(body)
+        #FixGType().visit(body)
+        AttributeFixer(self).visit(body)
 
         return_type_finder = ReturnTypeFinder(self)
         return_type_finder.visit(body)
