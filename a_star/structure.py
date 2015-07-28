@@ -2,9 +2,9 @@ from ctypes import Structure
 from ctree.c.nodes import Statement, Block, SymbolRef
 from ctree.types import register_type_codegenerators
 
-
 register_type_codegenerators({
     Structure: lambda t: "struct " + type(t).__name__})
+
 
 class CodegenableStruct(Structure):
     def codegen(self):
@@ -24,7 +24,4 @@ class StructDef(Statement):
         self.initializer = initializer
 
     def codegen(self, indent=0):
-        gen = "struct " + self.struct_name + self.block.codegen(indent)
-        print gen
-        return gen
-
+        return "struct " + self.struct_name + self.block.codegen(indent)
