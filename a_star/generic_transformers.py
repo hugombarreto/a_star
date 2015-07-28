@@ -105,6 +105,11 @@ class TypeTrackingTransformer(NodeTransformer):
         node_type = node.value
         if isinstance(node_type, ast.Call):
             node_type = node_type.func.id
+        if isinstance(node_type, FunctionCall) and \
+                hasattr(node_type.func, "get_type"):
+            node_type = node_type.func.get_type()
+        if isinstance(node_type, ast.Subscript):
+            node_type = self.variable_types[node_type.value.id]._type_()
 
         for target in node.targets:
             attr_name = None
@@ -133,16 +138,16 @@ class TypeTrackingTransformer(NodeTransformer):
 
 
 class MethodCallsTransformer(TypeTrackingTransformer):
-    def __init__(self, recursive_specializer=None):
+    def __init__(self, rec_specializer=None):
         super(MethodCallsTransformer, self).__init__()
         self.object_methods = []
-        self_object = recursive_specializer.self_object
+        self_object = rec_specializer.self_object
         if self_object is not None:
             for attr in dir(self_object):
                 if hasattr(getattr(self_object, attr), '__call__'):
                     self.object_methods.append(attr)
         self.self_object = self_object
-        self.recursive_specializer = recursive_specializer
+        self.rec_specializer = rec_specializer
 
     def visit_Call(self, node):
         self.generic_visit(node)
@@ -159,21 +164,21 @@ class MethodCallsTransformer(TypeTrackingTransformer):
                     raise NotImplementedError("Method from self object was not"
                                               " found (%s)" % func.attr)
                 func_name = "self_" + func.attr
-                if func_name not in self.recursive_specializer.func_def_names:
+                if func_name not in self.rec_specializer.func_def_names:
                     func_def = get_ast(getattr(self.self_object, func.attr))
                     func_def = func_def.body[0]
                     func_def.name = func_name
 
-                    func_def = self.recursive_specializer.visit(func_def)
-                    self.recursive_specializer.func_defs.append(func_def)
-                    self.recursive_specializer.func_def_names.append(func_name)
+                    func_def = self.rec_specializer.visit(func_def)
+                    self.rec_specializer.func_defs.append(func_def)
+                    self.rec_specializer.func_def_names.append(func_name)
 
                 node = FunctionCall(SymbolRef(func_name), node.args)
             else:
                 func_name = object_name + "_" + func.attr
                 node = FunctionCall(SymbolRef(func_name), node.args)
 
-            if func_name not in self.recursive_specializer.func_def_names:
+            if func_name not in self.rec_specializer.func_def_names:
                 params = []
                 generic_att_cntr = 0
                 for param in node.args:
@@ -182,9 +187,14 @@ class MethodCallsTransformer(TypeTrackingTransformer):
                     params.append(param)
                     generic_att_cntr += 1
 
-                self.recursive_specializer.func_defs.append(
+                self.rec_specializer.func_defs.append(
                     FunctionDecl(None, func_name, params=params, defn=None))
-                self.recursive_specializer.func_def_names.append(func_name)
+                self.rec_specializer.func_def_names.append(func_name)
+            else:
+                func_decl = next(t for t in self.rec_specializer.func_defs if
+                                 t.name == func_name)
+                if func_decl is not None:
+                    node.func.get_type = lambda: func_decl.return_type
         return node
 
 
@@ -220,4 +230,29 @@ class ReturnTypeFinder(TypeTrackingTransformer):
             self.return_type = self.variable_types[attr_name]
 
         return node
+
+
+class AttributeFixer(TypeTrackingTransformer):
+    def __init__(self, rec_specializer):
+        super(AttributeFixer, self).__init__()
+        self.rec_specializer = rec_specializer
+
+    def visit_Attribute(self, node):
+        self.generic_visit(node)
+        attr_name = node.attr
+        target_name = node.value.id
+        attr_type = get_ctype(getattr(self.variable_types[target_name],
+                                      attr_name))
+        attr = SymbolRef(attr_name)
+        target = SymbolRef(target_name)
+        setattr(attr, "get_type", lambda: attr_type)
+        return BinaryOp(target, Op.Dot(), attr)
+
+
+# class ArrayRefTypeGetter(TypeTrackingTransformer):
+#     def __init__(self, rec_specializer):
+#         super(ArrayRefTypeGetter, self).__init__()
+#         self.rec_specializer = rec_specializer
+#
+#     def visit_ArrayRef
 
