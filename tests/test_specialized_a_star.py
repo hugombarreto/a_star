@@ -11,14 +11,17 @@ class TestSpecializedAStar(TestAStar):
     # @profile
     def test_compare_specialization(self):
         grid, start, finish = get_random_grid(self.grid_size, self.grid_type)
+        print "Start C"
         c_cost = self._get_a_star_cost(grid, start, finish)
+        print "Finish C\nStart Python"
         py_cost = super(TestSpecializedAStar, self)._get_a_star_cost(
             grid, start, finish)
+        print "Finish Python"
 
         self.assertEqual(py_cost, c_cost)
 
     def test_many_comparisons(self):
-        for _ in xrange(100):
+        for _ in xrange(4):
             self.test_compare_specialization()
 
     def _get_a_star_cost(self, grid, start, finish):
@@ -39,10 +42,10 @@ class TestSpecializedAStar(TestAStar):
 
 
 if __name__ == '__main__':
-    # suite = unittest.TestLoader().loadTestsFromTestCase(TestSpecializedAStar)
+    suite = unittest.TestLoader().loadTestsFromTestCase(TestSpecializedAStar)
 
-    suite = unittest.TestSuite()
-    suite.addTest(TestSpecializedAStar('test_many_random_grids'))
+    # suite = unittest.TestSuite()
+    # suite.addTest(TestSpecializedAStar('test_many_random_grids'))
 
     unittest.TextTestRunner(verbosity=0).run(suite)
 

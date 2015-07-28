@@ -48,14 +48,14 @@ class TestAStar(unittest.TestCase):
     def __init__(self, *args, **kwargs):
         super(TestAStar, self).__init__(*args, **kwargs)
         self.grid_type = GridAsArray
-        self.grid_size = (10, 5, 9)
+        self.grid_size = (4096, 2160)
 
     def test_random_grid(self):
         grid, start, finish = get_random_grid(self.grid_size, self.grid_type)
         self._test_grid(grid, start, finish)
 
     def test_many_random_grids(self):
-        for _ in xrange(100):
+        for _ in xrange(4):
             self.test_random_grid()
 
     def test_grid_from_file(self):
