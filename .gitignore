@@ -9,3 +9,6 @@
 
 # kernprof files
 *.lprof
+
+#pickle files
+*.p
