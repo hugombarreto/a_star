@@ -153,6 +153,7 @@ class NeighborWeightListConverter(object):
         neighborhood_matrix = self.self_object.neighborhood_matrix
         grid_multiplier = self._get_grid_multiplier()
         neighbor_differences = list(neighborhood_matrix.dot(grid_multiplier))
+        neighbor_differences.sort()
         return map(lambda x: Constant(x), neighbor_differences)
 
     def _get_number_neighbors(self):
