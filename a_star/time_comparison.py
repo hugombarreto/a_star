@@ -19,14 +19,14 @@ def time_comparison(max_grid_size=10000000, dimensions=range(2, 6),
                 grid = get_random_grid((dim_size,)*num_dim, grid_type)
 
                 start = time.time()
-                SpecializedGrid.get_a_star_cost(*grid)
+                GridAsArray.get_a_star_cost(*grid)
                 finish = time.time()
                 interval = finish - start
                 py_times.append((num_dim, dim_size, interval))
                 print "python: ", interval
 
                 start = time.time()
-                GridAsArray.get_a_star_cost(*grid)
+                SpecializedGrid.get_a_star_cost(*grid)
                 finish = time.time()
                 interval = finish - start
                 ctree_times.append((num_dim, dim_size, interval))
