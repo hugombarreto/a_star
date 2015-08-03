@@ -12,10 +12,9 @@ class TestSpecializedAStar(TestAStar):
     def test_compare_specialization(self):
         grid, start, finish = get_random_grid(self.grid_size, self.grid_type)
         print "Start C"
-        c_cost = self._get_a_star_cost(grid, start, finish)
+        c_cost = self.get_a_star_cost(grid, start, finish)
         print "Finish C\nStart Python"
-        py_cost = super(TestSpecializedAStar, self)._get_a_star_cost(
-            grid, start, finish)
+        py_cost = TestAStar.get_a_star_cost(grid, start, finish)
         print "Finish Python"
 
         self.assertEqual(py_cost, c_cost)
@@ -24,7 +23,8 @@ class TestSpecializedAStar(TestAStar):
         for _ in xrange(4):
             self.test_compare_specialization()
 
-    def _get_a_star_cost(self, grid, start, finish):
+    @staticmethod
+    def get_a_star_cost(grid, start, finish):
         path_trace = grid.specialized_a_star(start, finish)
 
         if start == finish:
