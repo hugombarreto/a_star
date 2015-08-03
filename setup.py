@@ -1,15 +1,15 @@
 from distutils.core import setup
 
 setup(
-    name='AStarSpecializer',
+    name='a_star',
     version='0.95a',
 
     packages=[
-        'AStarSpecializer',
+        'a_star',
     ],
 
     package_data={
-        'AStarSpecializer': ['defaults.cfg'],
+        'a_star': ['defaults.cfg'],
     },
 
     install_requires=[
