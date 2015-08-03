@@ -6,11 +6,11 @@ from os import listdir
 from a_star.astar import GridAsArray
 
 
-def get_random_grid(dimension, grid_type, barrier_probability=0.3):
+def get_random_grid(dimension, grid_type, barrier_prob=0.3, weight=False):
     if not isinstance(grid_type, type):
         grid_type = type(grid_type)
     generate_barriers = np.vectorize(lambda i: np.inf
-        if i < barrier_probability else np.rint(i*1000)+1)
+        if i < barrier_prob else int(weight) * np.rint(i*1000) + 1)
     grid_array = generate_barriers(np.random.rand(*dimension))
 
     margin_grid = np.pad(grid_array, 1, 'constant', constant_values=-1)
@@ -69,8 +69,8 @@ class TestAStar(unittest.TestCase):
                             "grid from file:" + file_name, False)
 
     def _test_grid(self, grid, start, finish, msg=None, save=True):
-        start_finish_cost = self._get_a_star_cost(grid, start, finish)
-        finish_start_cost = self._get_a_star_cost(grid, finish, start)
+        start_finish_cost = self.get_a_star_cost(grid, start, finish)
+        finish_start_cost = self.get_a_star_cost(grid, finish, start)
 
         if save and (start_finish_cost != finish_start_cost):
             path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
@@ -79,7 +79,8 @@ class TestAStar(unittest.TestCase):
 
         self.assertEqual(start_finish_cost, finish_start_cost, msg)
 
-    def _get_a_star_cost(self, grid, start, finish):
+    @staticmethod
+    def get_a_star_cost(grid, start, finish):
         path_trace = grid.a_star(start, finish)
         if tuple(finish) not in path_trace:
             return None
@@ -95,7 +96,11 @@ class TestAStar(unittest.TestCase):
 
 
 if __name__ == '__main__':
-    print "start"
-    suite = unittest.TestLoader().loadTestsFromTestCase(TestAStar)
-    unittest.TextTestRunner(verbosity=0).run(suite)
-    print "finish"
+    # print "start"
+    # suite = unittest.TestLoader().loadTestsFromTestCase(TestAStar)
+    # unittest.TextTestRunner(verbosity=0).run(suite)
+    # print "finish"
+    suite = unittest.TestSuite()
+    suite.addTest(TestAStar('test_many_random_grids'))
+
+    unittest.TextTestRunner(verbosity=1).run(suite)
