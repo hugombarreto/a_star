@@ -369,3 +369,19 @@ class SpecializedGrid(GridAsArray):
         target = combine_coordinates(target_id, self.grid_shape)
         nodes_parent = np.full(self.grid_shape, -1)
         return self._c_a_star(self.grid, start, target, nodes_parent, self)
+
+    def get_a_star_cost(self, start, finish):
+        path_trace = self.specialized_a_star(start, finish)
+
+        if start == finish:
+            return 0
+
+        if path_trace[finish] < 0:
+            return None
+
+        node = finish
+        cost = 0
+        while node != start:
+            cost += self.grid[node]
+            node = decompose_coordinates(path_trace[node], self.grid_shape)
+        return cost

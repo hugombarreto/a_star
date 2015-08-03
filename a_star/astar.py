@@ -103,6 +103,20 @@ class Graph(object):
             self.parent = None
             self.closed = False
 
+    def get_a_star_cost(self, start, finish):
+        path_trace = self.a_star(start, finish)
+        if tuple(finish) not in path_trace:
+            return None
+
+        cost = 0
+        node = finish
+        while tuple(node) != tuple(start):
+            current_parent = path_trace[tuple(node)].parent
+            cost += self.get_neighbor_edges(current_parent)[tuple(node)]
+            node = current_parent
+
+        return cost
+
 
 class BaseGrid(Graph):
     """Base class for grids, implements grids heuristic"""

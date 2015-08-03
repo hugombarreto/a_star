@@ -1,12 +1,8 @@
 """
-specializer AStarSpecializer
+specializer a_star
 """
 
-import unittest
-from tests.time_comparison import TimeComparison
+from a_star.time_comparison import time_comparison
 
 if __name__ == '__main__':
-    suite = unittest.TestSuite()
-    suite.addTest(TimeComparison('test_growing_size'))
-
-    unittest.TextTestRunner(verbosity=1).run(suite)
+    time_comparison(50000000)
