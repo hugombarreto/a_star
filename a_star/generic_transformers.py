@@ -253,12 +253,3 @@ class AttributeFixer(TypeTrackingTransformer):
         target = SymbolRef(target_name)
         setattr(attr, "get_type", lambda: attr_type)
         return BinaryOp(target, Op.Dot(), attr)
-
-
-# class ArrayRefTypeGetter(TypeTrackingTransformer):
-#     def __init__(self, rec_specializer):
-#         super(ArrayRefTypeGetter, self).__init__()
-#         self.rec_specializer = rec_specializer
-#
-#     def visit_ArrayRef
-
