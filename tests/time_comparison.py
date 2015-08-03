@@ -7,7 +7,7 @@ from tests.test_specialized_a_star import TestSpecializedAStar
 
 class TimeComparison(TestSpecializedAStar):
     def test_growing_size(self):
-        max_grid_size = 10000000
+        max_grid_size = 50000000
         dimensions = range(2, 6)
         sizes_per_dim = 10
         num_samples = 10
