@@ -18,7 +18,7 @@ from a_star.priority_queue_interface import transform_priority_queue, \
 import logging
 from a_star.structure import StructDef
 
-logging.basicConfig(level=logging.DEBUG)
+# logging.basicConfig(level=logging.DEBUG)
 
 
 class DictToArrayTransformer(NodeTransformer):
@@ -194,15 +194,6 @@ class NodesInfoTransformer(NodeTransformer):
               Return(SymbolRef("nodes_parent_temp"))])
 
 
-# TODO find out why g is not getting the type properly
-class FixGType(NodeTransformer):
-    def visit_Assign(self, node):
-        if hasattr(node.targets[0], 'id'):
-            if node.targets[0].id == "g":
-                node.targets[0] = SymbolRef("g", ctypes.c_double())
-        return node
-
-
 class RecursiveSpecializer(object):
     """Specializes a body and all the eventual methods called from it"""
     def __init__(self, tree, self_object, grid_type):
@@ -247,7 +238,6 @@ class RecursiveSpecializer(object):
         MethodCallsTransformer(self).visit(body)
         AStarForConversions(self).visit(body)
         NodesInfoTransformer(self).visit(body)
-        #FixGType().visit(body)
         AttributeFixer(self).visit(body)
 
         return_type_finder = ReturnTypeFinder(self)
