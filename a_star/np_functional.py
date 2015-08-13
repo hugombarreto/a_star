@@ -4,8 +4,7 @@ from ctree.c.nodes import *
 from ctree.visitors import NodeTransformer
 import numpy as np
 
-np_functional_functions = ["np_map", "np_reduce", "np_filter",
-                           "np_elementwise"]
+np_functional_functions = ["np_map", "np_reduce", "np_elementwise"]
 
 
 def np_map(function, array):
@@ -84,11 +83,6 @@ class TransformFunctionalNP(NodeTransformer):
                     ),
                 Return(SymbolRef("accumulator")),
             ]
-
-        elif func_name == "np_filter":
-            return_type = self.array_type()
-            defn = None  # change that
-            # TODO implement filter
 
         elif func_name == "np_elementwise":
             params.append(SymbolRef("B", self.array_type()))
