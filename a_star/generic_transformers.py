@@ -17,20 +17,17 @@ class LambdaLifter(NodeTransformer):
         self.recursive_specializer = recursive_specializer
 
     def visit_Lambda(self, node):
-        if isinstance(node, ast.Lambda):
-            self.generic_visit(node)
-            macro_name = "LAMBDA_" + str(self.lambda_counter)
-            LambdaLifter.lambda_counter += 1
-            node = PyBasicConversions().visit(node)
-            node.name = macro_name
-            macro = CppDefine(macro_name, node.params, node.defn[0].value)
-            self.lifted_functions.append(macro)
-            if self.recursive_specializer is not None:
-                self.recursive_specializer.defines.append(macro)
+        self.generic_visit(node)
+        macro_name = "LAMBDA_" + str(self.lambda_counter)
+        LambdaLifter.lambda_counter += 1
+        node = PyBasicConversions().visit(node)
+        node.name = macro_name
+        macro = CppDefine(macro_name, node.params, node.defn[0].value)
+        self.lifted_functions.append(macro)
+        if self.recursive_specializer is not None:
+            self.recursive_specializer.defines.append(macro)
 
-            return SymbolRef(macro_name)
-        else:
-            return node
+        return SymbolRef(macro_name)
 
 
 class ClassToStructureTransformer(NodeTransformer):
