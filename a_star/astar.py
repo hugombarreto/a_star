@@ -10,10 +10,8 @@ class PriorityQueue(object):
     def __init__(self):
         self._heap = []
 
-    def push(self, item, priority=None):
+    def push(self, item):
         """Insert item in the queue"""
-        if priority is not None:
-            item.set_priority(priority)
         heapq.heappush(self._heap, item)
 
     def pop(self):
