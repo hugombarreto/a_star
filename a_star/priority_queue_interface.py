@@ -6,7 +6,6 @@ from a_star.generic_transformers import ClassToStructureTransformer
 from a_star.structure import StructDef, CodegenableStruct
 
 
-# TODO may change heap_element to HeapElement
 class heap_element(CodegenableStruct):
     _fields_ = [("id", ctypes.c_int), ("priority", ctypes.c_long)]
 
