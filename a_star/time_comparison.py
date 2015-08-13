@@ -32,15 +32,15 @@ def time_comparison(max_grid_size=10000000, dimensions=range(2, 6),
                 ctree_times.append((num_dim, dim_size, interval))
                 print "ctree: ", interval
 
-    with open('astar_times_python.csv', 'wb') as csvfile:
-        csvwriter = csv.writer(csvfile)
-        for sample in py_times:
-            csvwriter.writerow(sample)
+    save_times_csv(py_times, 'astar_times_python.csv')
+    save_times_csv(ctree_times, 'astar_times_ctree.csv')
 
-    with open('astar_times_ctree.csv', 'wb') as csvfile:
-        csvwriter = csv.writer(csvfile)
-        for sample in ctree_times:
-            csvwriter.writerow(sample)
+
+def save_times_csv(time_samples, filename):
+    with open(filename, 'wb') as csv_file:
+        csv_writer = csv.writer(csv_file)
+        for sample in time_samples:
+            csv_writer.writerow(sample)
 
 if __name__ == '__main__':
     time_comparison()
